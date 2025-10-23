@@ -2,102 +2,36 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <title>Multiplayer Ping Pong - Custom Rooms</title>
-    <style>
-        body {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
-            background-color: #000000;
-            font-family: 'Arial', sans-serif;
-            overflow: hidden; 
-        }
-
-        canvas {
-            border: 4px solid #FFFFFF;
-            border-radius: 10px; 
-            box-shadow: 0 0 20px rgba(255, 255, 255, 0.3); 
-            background-color: #000000; 
-            display: none; /* Ẩn canvas khi chưa vào game */
-        }
-        
-        #message {
-            position: absolute;
-            color: #FFFFFF; 
-            font-size: 24px;
-            font-weight: bold;
-            top: 50%; 
-            left: 50%;
-            transform: translate(-50%, -50%);
-            text-align: center;
-            z-index: 10; 
-            text-shadow: 0 0 10px rgba(255, 255, 255, 0.5); 
-            
-            /* KHẮC PHỤC LỖI: ẨN MẶC ĐỊNH */
-            display: none; 
-        }
-
-        /* Giao diện LOBBY */
-        #lobby {
-            color: #FFFFFF;
-            padding: 20px;
-            border: 2px solid #555;
-            border-radius: 8px;
-            text-align: center;
-            display: block; 
-            width: 300px;
-            max-width: 90%;
-            background-color: #111;
-        }
-        #lobby h2 {
-            text-shadow: 0 0 5px #fff;
-        }
-        #lobby input, #lobby select, #lobby button {
-            padding: 10px;
-            margin: 8px 0;
-            border-radius: 5px;
-            border: none;
-            width: 100%;
-            box-sizing: border-box;
-            font-size: 16px;
-        }
-        #lobby select {
-            background-color: #333;
-            color: white;
-        }
-        #lobby button {
-            background-color: #007bff;
-            color: white;
-            cursor: pointer;
-            font-weight: bold;
-        }
-        #lobby button:hover {
-            background-color: #0056b3;
-        }
-    </style>
+    <title>Multiplayer Ping Pong</title>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    
+
     <div id="lobby">
-        <h2>Tham gia Phòng</h2>
-        <input type="text" id="roomIdInput" placeholder="Nhập ID Phòng (VD: 123456)">
+        <h2>Tham gia Phòng (Join Room)</h2>
         
-        <label for="difficultySelect" style="display: block; margin-top: 15px; margin-bottom: 5px;">Chọn Độ Khó:</label>
+        <input type="text" id="roomIdInput" placeholder="Nhập ID Phòng (VD: Phong123)">
+        
+        <label for="difficultySelect">Chọn Độ Khó:</label>
         <select id="difficultySelect">
             <option value="easy">Dễ (Easy)</option>
             <option value="medium" selected>Trung bình (Medium)</option>
             <option value="hard">Khó (Hard)</option>
         </select>
-
-        <button id="joinButton">Tham gia Phòng</button>
+        
+        <button id="joinButton" class="btn btn-primary">Tham gia Phòng Riêng</button>
+        
+        <div style="margin: 15px 0; font-weight: bold; color: #aaa;">-- HOẶC --</div>
+        
+        <button id="randomButton" class="btn btn-danger" style="background-color: #dc3545;">Tìm Trận Ngẫu Nhiên</button>
     </div>
 
-    <canvas id="gameCanvas" width="600" height="400"></canvas>
-    <div id="message"></div> 
-    
-    <script src="/socket.io/socket.io.js"></script> 
+    <div id="game-container" style="display:none;">
+        <div id="message">Đang chờ người chơi...</div>
+        <canvas id="gameCanvas" width="600" height="400"></canvas>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
     <script src="game.js"></script>
 </body>
 </html>

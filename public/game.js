@@ -1,209 +1,168 @@
-// public/game.js
+const socket = io();
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
-const msgDiv = document.getElementById('message'); 
+
 const lobbyDiv = document.getElementById('lobby');
+const gameContainerDiv = document.getElementById('game-container');
+const msgDiv = document.getElementById('message');
+
 const joinButton = document.getElementById('joinButton');
+const randomButton = document.getElementById('randomButton'); // KHAI BÁO NÚT MỚI
 const roomIdInput = document.getElementById('roomIdInput');
 const difficultySelect = document.getElementById('difficultySelect');
 
-// --- Kết nối đến Server Node.js ---
-const socket = io(); 
-
-// --- Cài đặt Chung ---
-const GAME_WIDTH = canvas.width;
-const GAME_HEIGHT = canvas.height;
-const PADDLE_WIDTH = 10;
-const BALL_SIZE = 8;
-
-// Mảng 7 màu cầu vồng 
+let playerNumber = null;
+let gameState = null;
+let keys = {}; 
+const PADDLE_HEIGHT = 80;
 const RAINBOW_COLORS = [
-    '#FF0000', '#FFA500', '#FFFF00', '#00FF00', '#00BFFF', '#4B0082', '#9400D3'
+    '#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#9400D3'
 ];
 
-let playerNum = null; 
-let isP1 = false; 
-let gameState = null; 
-let currentSettings = null; 
+// =========================================================================
+// XỬ LÝ SỰ KIỆN LOBBY (JOIN ROOM / RANDOM MATCH)
+// =========================================================================
 
-// ==========================================================
-// HÀM TẠO ID NGẪU NHIÊN 6 CHỮ SỐ
-// ==========================================================
-function generateRandomRoomId() {
-    // Tạo số ngẫu nhiên từ 100000 đến 999999
-    const min = 100000;
-    const max = 999999;
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-}
-
-// Gán ID ngẫu nhiên cho ô nhập liệu ngay khi script được tải
-roomIdInput.value = generateRandomRoomId();
-
-// ==========================================================
-// I. XỬ LÝ LOBBY
-// ==========================================================
-
+// --- Logic Tham gia Phòng Riêng ---
 joinButton.addEventListener('click', () => {
     const roomId = roomIdInput.value.trim();
     const difficulty = difficultySelect.value;
-
+    
     if (roomId) {
         lobbyDiv.style.display = 'none'; 
+        gameContainerDiv.style.display = 'block'; 
         msgDiv.style.display = 'block'; 
         msgDiv.textContent = 'Đang cố gắng tham gia phòng...';
         
-        socket.emit('joinRoom', { roomId, difficulty });
+        socket.emit('joinRoom', { roomId: roomId, difficulty: difficulty });
     } else {
         alert('Vui lòng nhập ID Phòng.');
     }
 });
 
-
-// ==========================================================
-// II. SOCKET.IO VÀ CẬP NHẬT TRẠNG THÁI TỪ SERVER
-// ==========================================================
-
-socket.on('roomError', (message) => {
-    lobbyDiv.style.display = 'block';
-    msgDiv.style.display = 'none'; 
-    alert(message);
-});
-
-socket.on('waiting', (message) => {
-    msgDiv.textContent = message;
+// --- Logic Tìm Trận Ngẫu Nhiên ---
+randomButton.addEventListener('click', () => {
+    const difficulty = difficultySelect.value;
+    
+    lobbyDiv.style.display = 'none'; 
+    gameContainerDiv.style.display = 'block'; 
     msgDiv.style.display = 'block'; 
-    canvas.style.display = 'block'; 
+    msgDiv.textContent = 'Đang tìm kiếm trận đấu ngẫu nhiên...';
+
+    // Gửi ID đặc biệt để Server xử lý logic ghép trận
+    socket.emit('joinRoom', { roomId: 'RANDOM_MATCH', difficulty: difficulty }); 
 });
+
+// =========================================================================
+// XỬ LÝ SOCKET.IO VÀ GAME LOOP
+// =========================================================================
 
 socket.on('playerAssignment', (data) => {
-    playerNum = data.playerNum;
-    isP1 = data.isP1;
-    currentSettings = data.settings; 
-    msgDiv.textContent = `Bạn là người chơi ${playerNum}. Đang chờ người chơi 2...`;
-    msgDiv.style.display = 'block'; 
-    canvas.style.display = 'block'; 
+    playerNumber = data.player;
+    const playerText = (playerNumber === 1) ? "1 (Trái)" : "2 (Phải)";
+    msgDiv.textContent = `Bạn là Người chơi ${playerText}. Phòng ID: ${data.roomId}. Đang chờ đối thủ...`;
 });
 
-socket.on('gameStart', () => {
-    msgDiv.style.display = 'none'; 
+socket.on('gameStart', (state) => {
+    gameState = state;
+    msgDiv.style.display = 'none';
+    requestAnimationFrame(gameLoopClient);
+});
+
+// ... (Các phần còn lại của game.js giữ nguyên) ...
+socket.on('roomFull', () => {
+    alert('Phòng đã đầy. Vui lòng chọn phòng khác.');
+    lobbyDiv.style.display = 'block';
+    gameContainerDiv.style.display = 'none';
 });
 
 socket.on('gameState', (state) => {
     gameState = state;
-    if (gameState && !gameState.isGameOver) {
-        msgDiv.style.display = 'none'; 
-    }
-    draw(); 
 });
 
-socket.on('playerDisconnected', (message) => {
-    msgDiv.textContent = message;
+socket.on('serverMessage', (data) => {
+    msgDiv.textContent = data.message;
     msgDiv.style.display = 'block';
 });
 
-// ==========================================================
-// III. HÀM VẼ (DRAWING FUNCTIONS)
-// ==========================================================
-
-function drawText(text, x, y, size, color) {
-    ctx.font = `bold ${size}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.fillStyle = color;
-    ctx.fillText(text, x, y);
-}
-
-function draw() {
-    if (!gameState || !currentSettings) return; 
-
-    const PADDLE_HEIGHT = currentSettings.PADDLE_HEIGHT;
-    const currentColor = RAINBOW_COLORS[gameState.colorIndex];
-
-    canvas.style.borderColor = currentColor; 
-    canvas.style.boxShadow = `0 0 20px ${currentColor}`; 
-
-    ctx.fillStyle = '#000000'; 
-    ctx.fillRect(0, 0, GAME_WIDTH, GAME_HEIGHT);
-
-    ctx.fillStyle = currentColor;
-    ctx.strokeStyle = currentColor;
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = currentColor;
-
-    ctx.beginPath();
-    ctx.setLineDash([10, 5]);
-    ctx.lineWidth = 2;
-    ctx.moveTo(GAME_WIDTH / 2, 0);
-    ctx.lineTo(GAME_WIDTH / 2, GAME_HEIGHT);
-    ctx.stroke();
-
-    ctx.shadowBlur = 0; 
-    ctx.shadowColor = 'transparent';
+document.addEventListener('keydown', (e) => {
+    keys[e.key] = true;
     
-    drawText(gameState.score.player1, GAME_WIDTH / 4, 60, 60, '#FFFFFF'); 
-    drawText(gameState.score.player2, GAME_WIDTH * 3 / 4, 60, 60, '#FFFFFF'); 
-    
-    ctx.shadowBlur = 10;
-    ctx.shadowColor = currentColor;
-
-    for (const pID in gameState.players) {
-        const p = gameState.players[pID];
-        ctx.fillRect(p.x, p.y, PADDLE_WIDTH, PADDLE_HEIGHT);
+    if (e.key === ' ' && gameState && gameState.isGameOver) {
+        socket.emit('restartGame');
     }
-    
-    ctx.beginPath();
-    ctx.arc(gameState.ball.x, gameState.ball.y, BALL_SIZE, 0, Math.PI * 2); 
-    ctx.shadowBlur = 15; 
-    ctx.fill();
-    ctx.closePath();
-    
+});
+document.addEventListener('keyup', (e) => {
+    keys[e.key] = false;
+});
+
+function gameLoopClient() {
+    if (!gameState) return;
+
+    updatePlayerMovement(); 
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    drawGame(gameState);
+
     if (gameState.isGameOver) {
         msgDiv.style.display = 'block';
-        if (gameState.score.player1 > gameState.score.player2) {
-            msgDiv.textContent = 'NGƯỜI CHƠI 1 THẮNG! (Nhấn SPACE để chơi lại)';
-        } else {
-            msgDiv.textContent = 'NGƯỜI CHƠI 2 THẮNG! (Nhấn SPACE để chơi lại)';
-        }
+        const winner = gameState.score.player1 > gameState.score.player2 ? "NGƯỜI CHƠI 1" : "NGƯỜI CHƠI 2";
+        msgDiv.textContent = `${winner} THẮNG! NHẤN SPACE để chơi lại`;
+    }
+
+    requestAnimationFrame(gameLoopClient);
+}
+
+function updatePlayerMovement() {
+    if (!playerNumber || !gameState) return;
+    
+    let currentY = (playerNumber === 1) ? gameState.player1Y : gameState.player2Y;
+    let newY = currentY;
+    const speed = gameState.paddleSpeed; 
+
+    if (playerNumber === 1) { 
+        if (keys['w'] || keys['W']) newY -= speed;
+        if (keys['s'] || keys['S']) newY += speed;
+    } else if (playerNumber === 2) { 
+        if (keys['ArrowUp']) newY -= speed;
+        if (keys['ArrowDown']) newY += speed;
+    }
+
+    if (newY < 0) newY = 0;
+    if (newY > canvas.height - PADDLE_HEIGHT) newY = canvas.height - PADDLE_HEIGHT;
+
+    if (newY !== currentY) {
+        socket.emit('move', { y: newY });
     }
 }
 
-// ==========================================================
-// IV. XỬ LÝ PHÍM (GỬI TÍN HIỆU CHO SERVER)
-// ==========================================================
+function drawGame(state) {
+    const color = RAINBOW_COLORS[state.colorIndex];
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 10;
+    ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
 
-function handleMove(direction) {
-    if (!gameState || gameState.isGameOver) {
-        if (event.key === ' ' || event.key === 'Spacebar') {
-            socket.emit('restartGame'); 
-        }
-        return;
-    }
-    socket.emit('paddleMove', { direction: direction });
+    ctx.setLineDash([5, 10]);
+    ctx.strokeStyle = '#333';
+    ctx.beginPath();
+    ctx.moveTo(canvas.width / 2, 0);
+    ctx.lineTo(canvas.width / 2, canvas.height);
+    ctx.stroke();
+
+    ctx.fillStyle = color;
+    ctx.fillRect(0, state.player1Y, 10, PADDLE_HEIGHT);
+    ctx.fillRect(canvas.width - 10, state.player2Y, 10, PADDLE_HEIGHT);
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(state.ballX, state.ballY, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#FFF';
+    ctx.font = 'bold 50px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(state.score.player1, canvas.width / 4, 60);
+    ctx.fillText(state.score.player2, (canvas.width / 4) * 3, 60);
 }
-
-document.addEventListener('keydown', (e) => {
-    if (!gameState) return;
-
-    if (isP1) {
-        if (e.key === 'w' || e.key === 'W') handleMove(-1);
-        else if (e.key === 's' || e.key === 'S') handleMove(1);
-    } else { 
-        if (e.key === 'ArrowUp') handleMove(-1);
-        else if (e.key === 'ArrowDown') handleMove(1);
-    }
-
-    if (e.key === ' ' || e.key === 'Spacebar') {
-        if (gameState.isGameOver) {
-            socket.emit('restartGame');
-        }
-    }
-});
-
-document.addEventListener('keyup', (e) => {
-    if (!gameState) return;
-
-    if (isP1) {
-        if (e.key === 'w' || e.key === 'W' || e.key === 's' || e.key === 'S') handleMove(0);
-    } else {
-        if (e.key === 'ArrowUp' || e.key === 'ArrowDown') handleMove(0);
-    }
-});
