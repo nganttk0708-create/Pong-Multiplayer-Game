@@ -16,9 +16,9 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // THIẾT LẬP VÀ BIẾN TOÀN CỤC
 // =========================================================================
 
-// THIẾT LẬP ĐỘ KHÓ CUỐI CÙNG (Tốc độ bóng ổn định, không tăng sau va chạm)
+// THIẾT LẬP ĐỘ KHÓ ỔN ĐỊNH: Tốc độ bóng thấp, Thanh trượt nhạy
 const DIFFICULTY_SETTINGS = {
-    // Tốc độ bóng thấp và ổn định (ballSpeed), Thanh trượt nhạy (paddleSpeed)
+    // Tốc độ bóng ổn định (ballSpeed), Thanh trượt nhạy (paddleSpeed)
     easy: { ballSpeed: 2, paddleSpeed: 8, scoreLimit: 5 }, 
     medium: { ballSpeed: 3, paddleSpeed: 7, scoreLimit: 7 }, 
     hard: { ballSpeed: 4, paddleSpeed: 6, scoreLimit: 10 } 
@@ -49,6 +49,8 @@ function createGameState(roomId, settings) {
         isGameOver: false,
         scoreLimit: settings.scoreLimit, 
         paddleSpeed: settings.paddleSpeed, 
+        // LƯU TRỮ TỐC ĐỘ BÓNG BAN ĐẦU ĐỂ DÙNG TRONG HÀM RESET
+        originalBallSpeed: settings.ballSpeed, 
         colorIndex: 0,
         interval: null // Lưu trữ Game Loop Interval ID
     };
@@ -57,9 +59,13 @@ function createGameState(roomId, settings) {
 function resetBall(room) {
     room.ballX = CANVAS_WIDTH / 2;
     room.ballY = CANVAS_HEIGHT / 2;
-    // Đảo hướng sau khi ghi điểm
-    room.ballDX = (room.ballDX > 0 ? -1 : 1) * rooms[room.id].paddleSpeed;
-    room.ballDY = rooms[room.id].paddleSpeed * (Math.random() > 0.5 ? 1 : -1);
+    
+    // SỬ DỤNG originalBallSpeed ĐỂ ĐẶT LẠI TỐC ĐỘ (FIX LỖI)
+    const speedMagnitude = room.originalBallSpeed; 
+
+    // Đảo hướng sau khi ghi điểm và dùng tốc độ ổn định
+    room.ballDX = (room.ballDX > 0 ? -1 : 1) * speedMagnitude;
+    room.ballDY = speedMagnitude * (Math.random() > 0.5 ? 1 : -1);
 }
 
 function gameLoop(room) {
@@ -79,14 +85,12 @@ function gameLoop(room) {
         room.ballY >= room.player1Y && 
         room.ballY <= room.player1Y + PADDLE_HEIGHT) {
         
-        // **ĐÃ BỎ CƠ CHẾ TĂNG TỐC BÓNG (Không có room.ballDX *= -1.1)**
         room.ballDX *= -1; // Chỉ đảo ngược hướng X, tốc độ giữ nguyên
         room.ballX = PADDLE_WIDTH + 1; 
         
         // Tính toán góc nảy
         let relativeIntersectY = (room.player1Y + (PADDLE_HEIGHT / 2)) - room.ballY;
         let normalizedRelativeIntersectionY = (relativeIntersectY / (PADDLE_HEIGHT / 2));
-        // Sử dụng lại tốc độ X (đã đảo ngược) cho thành phần Y để duy trì tốc độ
         room.ballDY = normalizedRelativeIntersectionY * Math.abs(room.ballDX); 
         
         room.colorIndex = (room.colorIndex + 1) % 7; 
@@ -97,14 +101,12 @@ function gameLoop(room) {
         room.ballY >= room.player2Y && 
         room.ballY <= room.player2Y + PADDLE_HEIGHT) {
         
-        // **ĐÃ BỎ CƠ CHẾ TĂNG TỐC BÓNG**
         room.ballDX *= -1; // Chỉ đảo ngược hướng X, tốc độ giữ nguyên
         room.ballX = CANVAS_WIDTH - PADDLE_WIDTH - 1; 
 
         // Tính toán góc nảy
         let relativeIntersectY = (room.player2Y + (PADDLE_HEIGHT / 2)) - room.ballY;
         let normalizedRelativeIntersectionY = (relativeIntersectY / (PADDLE_HEIGHT / 2));
-        // Sử dụng lại tốc độ X (đã đảo ngược) cho thành phần Y để duy trì tốc độ
         room.ballDY = normalizedRelativeIntersectionY * Math.abs(room.ballDX); 
 
         room.colorIndex = (room.colorIndex + 1) % 7; 
