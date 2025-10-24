@@ -49,7 +49,6 @@ randomButton.addEventListener('click', () => {
     msgDiv.style.display = 'block'; 
     msgDiv.textContent = 'Đang tìm kiếm trận đấu ngẫu nhiên...';
 
-    // Gửi ID đặc biệt để Server xử lý logic ghép trận
     socket.emit('joinRoom', { roomId: 'RANDOM_MATCH', difficulty: difficulty }); 
 });
 
@@ -63,17 +62,16 @@ socket.on('playerAssignment', (data) => {
     msgDiv.textContent = `Bạn là Người chơi ${playerText}. Phòng ID: ${data.roomId}. Đang chờ đối thủ...`;
 });
 
-socket.on('gameStart', (state) => {
-    gameState = state;
-    msgDiv.style.display = 'none';
-    requestAnimationFrame(gameLoopClient);
-});
-
-// ... (Các phần còn lại của game.js giữ nguyên) ...
 socket.on('roomFull', () => {
     alert('Phòng đã đầy. Vui lòng chọn phòng khác.');
     lobbyDiv.style.display = 'block';
     gameContainerDiv.style.display = 'none';
+});
+
+socket.on('gameStart', (state) => {
+    gameState = state;
+    msgDiv.style.display = 'none';
+    requestAnimationFrame(gameLoopClient);
 });
 
 socket.on('gameState', (state) => {
@@ -88,6 +86,7 @@ socket.on('serverMessage', (data) => {
 document.addEventListener('keydown', (e) => {
     keys[e.key] = true;
     
+    // Xử lý nút SPACE để chơi lại (chỉ khi game over)
     if (e.key === ' ' && gameState && gameState.isGameOver) {
         socket.emit('restartGame');
     }
@@ -101,6 +100,7 @@ function gameLoopClient() {
 
     updatePlayerMovement(); 
 
+    // Xóa màn hình
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -120,8 +120,9 @@ function updatePlayerMovement() {
     
     let currentY = (playerNumber === 1) ? gameState.player1Y : gameState.player2Y;
     let newY = currentY;
-    const speed = gameState.paddleSpeed; 
+    const speed = gameState.paddleSpeed; // Lấy tốc độ từ server
 
+    // Logic di chuyển
     if (playerNumber === 1) { 
         if (keys['w'] || keys['W']) newY -= speed;
         if (keys['s'] || keys['S']) newY += speed;
@@ -130,6 +131,7 @@ function updatePlayerMovement() {
         if (keys['ArrowDown']) newY += speed;
     }
 
+    // Giới hạn biên
     if (newY < 0) newY = 0;
     if (newY > canvas.height - PADDLE_HEIGHT) newY = canvas.height - PADDLE_HEIGHT;
 

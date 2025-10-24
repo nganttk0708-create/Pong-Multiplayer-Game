@@ -7,7 +7,7 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// RENDER sử dụng process.env.PORT, KHÔNG phải 3000
+// RENDER sử dụng process.env.PORT
 const PORT = process.env.PORT || 3000; 
 
 app.use(express.static(path.join(__dirname, '..', 'public')));
@@ -16,14 +16,16 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // THIẾT LẬP VÀ BIẾN TOÀN CỤC
 // =========================================================================
 
+// THIẾT LẬP ĐỘ KHÓ ĐÃ CÂN BẰNG (Thanh trượt nhạy hơn, bóng chậm hơn)
 const DIFFICULTY_SETTINGS = {
-    easy: { ballSpeed: 4, paddleSpeed: 5, scoreLimit: 5 },
-    medium: { ballSpeed: 6, paddleSpeed: 7, scoreLimit: 7 },
-    hard: { ballSpeed: 8, paddleSpeed: 9, scoreLimit: 10 }
+    // ballSpeed: tốc độ bóng; paddleSpeed: tốc độ thanh trượt (đã tăng)
+    easy: { ballSpeed: 3, paddleSpeed: 8, scoreLimit: 5 }, 
+    medium: { ballSpeed: 4, paddleSpeed: 7, scoreLimit: 7 }, 
+    hard: { ballSpeed: 5, paddleSpeed: 6, scoreLimit: 10 } 
 };
 
 let rooms = {};
-let waitingRoomId = null; // ID của phòng đang chờ người chơi ngẫu nhiên thứ 2 (Player 1)
+let waitingRoomId = null; // ID của phòng đang chờ người chơi ngẫu nhiên thứ 2
 
 const PADDLE_HEIGHT = 80;
 const PADDLE_WIDTH = 10;
@@ -47,13 +49,15 @@ function createGameState(roomId, settings) {
         isGameOver: false,
         scoreLimit: settings.scoreLimit, 
         paddleSpeed: settings.paddleSpeed, 
-        colorIndex: 0
+        colorIndex: 0,
+        interval: null // Lưu trữ Game Loop Interval ID
     };
 }
 
 function resetBall(room) {
     room.ballX = CANVAS_WIDTH / 2;
     room.ballY = CANVAS_HEIGHT / 2;
+    // Đảo hướng sau khi ghi điểm
     room.ballDX = (room.ballDX > 0 ? -1 : 1) * rooms[room.id].paddleSpeed;
     room.ballDY = rooms[room.id].paddleSpeed * (Math.random() > 0.5 ? 1 : -1);
 }
@@ -61,36 +65,40 @@ function resetBall(room) {
 function gameLoop(room) {
     if (!room.isGameRunning) return;
 
-    // ... (Toàn bộ logic di chuyển, va chạm, và ghi điểm) ...
+    // 1. Di chuyển bóng
     room.ballX += room.ballDX;
     room.ballY += room.ballDY;
 
-    // Va chạm trên/dưới
+    // 2. Va chạm trên/dưới
     if (room.ballY < 0 || room.ballY > CANVAS_HEIGHT) {
         room.ballDY *= -1;
     }
 
-    // Va chạm với Player 1 (Thanh trượt bên trái)
+    // 3. Va chạm với Player 1 (Trái)
     if (room.ballX <= PADDLE_WIDTH && 
         room.ballY >= room.player1Y && 
         room.ballY <= room.player1Y + PADDLE_HEIGHT) {
         
-        room.ballDX *= -1.1;
-        room.ballX = PADDLE_WIDTH + 1;
+        room.ballDX *= -1.1; // Tăng tốc độ bóng sau mỗi lần va chạm
+        room.ballX = PADDLE_WIDTH + 1; 
+        
+        // Tính toán góc nảy
         let relativeIntersectY = (room.player1Y + (PADDLE_HEIGHT / 2)) - room.ballY;
         let normalizedRelativeIntersectionY = (relativeIntersectY / (PADDLE_HEIGHT / 2));
-        room.ballDY = normalizedRelativeIntersectionY * room.paddleSpeed;
+        room.ballDY = normalizedRelativeIntersectionY * room.paddleSpeed; 
         
-        room.colorIndex = (room.colorIndex + 1) % 7;
+        room.colorIndex = (room.colorIndex + 1) % 7; 
     }
 
-    // Va chạm với Player 2 (Thanh trượt bên phải)
+    // 4. Va chạm với Player 2 (Phải)
     if (room.ballX >= CANVAS_WIDTH - PADDLE_WIDTH && 
         room.ballY >= room.player2Y && 
         room.ballY <= room.player2Y + PADDLE_HEIGHT) {
         
         room.ballDX *= -1.1; 
         room.ballX = CANVAS_WIDTH - PADDLE_WIDTH - 1; 
+
+        // Tính toán góc nảy
         let relativeIntersectY = (room.player2Y + (PADDLE_HEIGHT / 2)) - room.ballY;
         let normalizedRelativeIntersectionY = (relativeIntersectY / (PADDLE_HEIGHT / 2));
         room.ballDY = normalizedRelativeIntersectionY * room.paddleSpeed; 
@@ -98,7 +106,7 @@ function gameLoop(room) {
         room.colorIndex = (room.colorIndex + 1) % 7; 
     }
     
-    // Ghi điểm
+    // 5. Ghi điểm
     let scored = false;
     if (room.ballX < 0) {
         room.score.player2++;
@@ -134,11 +142,9 @@ io.on('connection', (socket) => {
         // --- LOGIC GHÉP TRẬN NGẪU NHIÊN ---
         if (roomId === 'RANDOM_MATCH') {
             if (waitingRoomId && rooms[waitingRoomId] && rooms[waitingRoomId].playerCount === 1) {
-                // Có phòng chờ: Tham gia phòng đó
                 roomId = waitingRoomId;
                 waitingRoomId = null; 
             } else {
-                // Không có phòng chờ: Tạo ID ngẫu nhiên và chuyển thành phòng chờ mới
                 roomId = Math.floor(100000 + Math.random() * 900000).toString();
                 waitingRoomId = roomId; 
             }
@@ -174,9 +180,14 @@ io.on('connection', (socket) => {
 
         } else if (room.playerCount === 2) {
             room.player2 = socket.id;
-            room.isGameRunning = true; // Bắt đầu game
-            io.to(roomId).emit('playerAssignment', { player: (socket.id === room.player1 ? 1 : 2), roomId: roomId });
-            io.to(roomId).emit('gameStart', room);
+            room.isGameRunning = true; 
+            
+            // Gán lại Player 2 (socket hiện tại) nếu Player 1 đã vào trước.
+            // Nếu P2 là socket hiện tại, gửi lại thông tin P2 cho socket này.
+            socket.emit('playerAssignment', { player: 2, roomId: roomId });
+            
+            // Gửi gameStart cho cả phòng
+            io.to(roomId).emit('gameStart', room); 
             
             if (roomId === waitingRoomId) {
                 waitingRoomId = null;
@@ -189,13 +200,14 @@ io.on('connection', (socket) => {
         }
     });
 
-    // ... (Logic move giữ nguyên) ...
+    // --- Di chuyển thanh trượt (Handle Paddle Movement) ---
     socket.on('move', (data) => {
         if (!currentRoomId || !rooms[currentRoomId] || rooms[currentRoomId].isGameOver) return;
         
         const room = rooms[currentRoomId];
         let newY = data.y;
         
+        // Đảm bảo thanh trượt không vượt quá biên
         if (newY < 0) newY = 0;
         if (newY > CANVAS_HEIGHT - PADDLE_HEIGHT) newY = CANVAS_HEIGHT - PADDLE_HEIGHT;
 
@@ -230,7 +242,7 @@ io.on('connection', (socket) => {
         room.playerCount--;
 
         if (room.playerCount <= 0) {
-            clearInterval(room.interval); // Dừng game loop
+            clearInterval(room.interval);
             delete rooms[currentRoomId];
             if (currentRoomId === waitingRoomId) {
                 waitingRoomId = null;
@@ -239,7 +251,7 @@ io.on('connection', (socket) => {
             room.isGameRunning = false;
             room.isGameOver = true; 
             
-            // Gán lại ID người chơi còn lại
+            // Gán lại người chơi còn lại thành Player 1
             room.player1 = (socket.id === room.player1) ? room.player2 : room.player1;
             room.player2 = null; 
             
