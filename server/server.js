@@ -65,12 +65,13 @@ function resetBall(room) {
 }
 
 function startGame(room) {
-    // Luôn dọn dẹp interval cũ trước khi bắt đầu game mới để tránh vòng lặp kép
+    // 1. Dọn dẹp interval cũ
     if (room.interval) {
         clearInterval(room.interval);
         room.interval = null;
     }
     
+    // 2. Reset trạng thái
     resetBall(room);
     room.score = { player1: 0, player2: 0 };
     room.isGameOver = false;
@@ -78,7 +79,7 @@ function startGame(room) {
     room.readyToRestart = { player1: false, player2: false }; 
     room.colorIndex = 0; 
     
-    // Khởi tạo vòng lặp game mới
+    // 3. Khởi tạo vòng lặp game mới
     room.interval = setInterval(() => gameLoop(room), 1000 / 60); 
     
     io.to(room.id).emit('gameStart', room); 
@@ -92,6 +93,8 @@ function gameLoop(room) {
         }
         return;
     }
+
+    // [Code game loop còn lại không đổi]
 
     // 1. Di chuyển bóng
     room.ballX += room.ballDX;
@@ -211,21 +214,22 @@ io.on('connection', (socket) => {
         } else if (room.playerCount === 2) {
             room.player2 = socket.id;
             
-            // Logic Bắt đầu Game được Tinh chỉnh:
-            // 1. Nếu Game đã kết thúc (Game Over) hoặc đang là Phòng Chờ (đợi người chơi mới tham gia phòng cũ)
-            if (room.isGameOver || isExistingWaitingRoom) { 
-                 // Gửi trạng thái game để người chơi biết cần nhấn SPACE hoặc đợi
-                 io.to(roomId).emit('gameState', room); 
-            } else {
-                 // 2. Nếu đây là phòng mới (không phải Game Over trước đó) VÀ đã đủ 2 người, BẮT ĐẦU GAME
-                 startGame(room);
-            }
-            
             socket.emit('playerAssignment', { player: 2, roomId: roomId });
             
             if (roomId === waitingRoomId) {
                 waitingRoomId = null;
             }
+
+            // --- ĐOẠN LOGIC BẮT ĐẦU GAME ĐƯỢC SỬA ---
+            // Nếu game đã kết thúc (người chơi cũ vừa chơi lại) hoặc phòng đang chờ (người chơi mới tham gia phòng chờ)
+            if (room.isGameOver || isExistingWaitingRoom) { 
+                 // Chỉ gửi trạng thái game để người chơi biết cần nhấn SPACE hoặc đợi
+                 io.to(roomId).emit('gameState', room); 
+            } else {
+                 // Đây là trận đấu MỚI (không phải chơi lại), BẮT ĐẦU GAME NGAY LẬP TỨC
+                 startGame(room); 
+            }
+            // ----------------------------------------
         }
     });
 
@@ -312,7 +316,6 @@ io.on('connection', (socket) => {
             
             const remainingPlayerId = (socket.id === room.player1) ? room.player2 : room.player1;
             
-            // Gán lại người chơi còn lại thành player 1
             room.player1 = remainingPlayerId;
             room.player2 = null; 
             room.readyToRestart = { player1: false, player2: false };
