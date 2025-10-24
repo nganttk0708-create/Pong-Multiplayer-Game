@@ -7,7 +7,7 @@ const gameContainerDiv = document.getElementById('game-container');
 const msgDiv = document.getElementById('message');
 
 const joinButton = document.getElementById('joinButton');
-const randomButton = document.getElementById('randomButton'); // KHAI BÁO NÚT MỚI
+const randomButton = document.getElementById('randomButton'); 
 const roomIdInput = document.getElementById('roomIdInput');
 const difficultySelect = document.getElementById('difficultySelect');
 
@@ -86,9 +86,9 @@ socket.on('serverMessage', (data) => {
 document.addEventListener('keydown', (e) => {
     keys[e.key] = true;
     
-    // Xử lý nút SPACE để chơi lại (chỉ khi game over)
+    // SỬA: Gửi tín hiệu 'playerReady' khi nhấn SPACE và game over
     if (e.key === ' ' && gameState && gameState.isGameOver) {
-        socket.emit('restartGame');
+        socket.emit('playerReady');
     }
 });
 document.addEventListener('keyup', (e) => {
@@ -100,16 +100,27 @@ function gameLoopClient() {
 
     updatePlayerMovement(); 
 
-    // Xóa màn hình
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     drawGame(gameState);
 
     if (gameState.isGameOver) {
-        msgDiv.style.display = 'block';
+        // Kiểm tra xem cả hai đã sẵn sàng chưa để hiển thị thông báo chính xác
+        let ready1 = gameState.readyToRestart.player1;
+        let ready2 = gameState.readyToRestart.player2;
+        
         const winner = gameState.score.player1 > gameState.score.player2 ? "NGƯỜI CHƠI 1" : "NGƯỜI CHƠI 2";
-        msgDiv.textContent = `${winner} THẮNG! NHẤN SPACE để chơi lại`;
+        
+        if (ready1 && ready2) {
+            // Trường hợp này không xảy ra vì game đã bắt đầu lại
+        } else if (ready1 || ready2) {
+             // Thông báo đang chờ người còn lại (sẽ được server gửi qua serverMessage)
+        } else {
+             // Thông báo chung
+             msgDiv.textContent = `${winner} THẮNG! NHẤN SPACE để chơi lại`;
+        }
+        msgDiv.style.display = 'block';
     }
 
     requestAnimationFrame(gameLoopClient);
@@ -120,9 +131,8 @@ function updatePlayerMovement() {
     
     let currentY = (playerNumber === 1) ? gameState.player1Y : gameState.player2Y;
     let newY = currentY;
-    const speed = gameState.paddleSpeed; // Lấy tốc độ từ server
+    const speed = gameState.paddleSpeed; 
 
-    // Logic di chuyển
     if (playerNumber === 1) { 
         if (keys['w'] || keys['W']) newY -= speed;
         if (keys['s'] || keys['S']) newY += speed;
@@ -131,7 +141,6 @@ function updatePlayerMovement() {
         if (keys['ArrowDown']) newY += speed;
     }
 
-    // Giới hạn biên
     if (newY < 0) newY = 0;
     if (newY > canvas.height - PADDLE_HEIGHT) newY = canvas.height - PADDLE_HEIGHT;
 
