@@ -108,15 +108,18 @@ function gameLoopClient() {
     if (gameState.isGameOver) {
         msgDiv.style.display = 'block';
         
-        // **ĐÃ SỬA: LUÔN HIỂN THỊ THÔNG BÁO CHO NGƯỜI CHƠI NHẤN SPACE**
         const winner = gameState.score.player1 > gameState.score.player2 ? "NGƯỜI CHƠI 1" : "NGƯỜI CHƠI 2";
         
-        // Nếu người chơi chưa sẵn sàng, hiển thị thông báo chung
-        if (!gameState.readyToRestart.player1 || !gameState.readyToRestart.player2) {
+        // Luôn hiển thị thông báo chiến thắng và yêu cầu nhấn SPACE, trừ khi server gửi thông báo khác
+        if (gameState.playerCount === 2 && (!gameState.readyToRestart.player1 || !gameState.readyToRestart.player2)) {
              msgDiv.textContent = `${winner} THẮNG! NHẤN SPACE để chơi lại`;
         }
-        // Khi một người đã nhấn, server sẽ gửi lại thông báo cụ thể (qua serverMessage)
+        // Lưu ý: Nếu playerCount === 1, server sẽ gửi thông báo qua 'serverMessage'
+        
+    } else if (gameState.isGameRunning) {
+        msgDiv.style.display = 'none';
     }
+
 
     requestAnimationFrame(gameLoopClient);
 }

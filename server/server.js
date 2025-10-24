@@ -16,12 +16,11 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // THIẾT LẬP VÀ BIẾN TOÀN CỤC
 // =========================================================================
 
-// ĐÃ TĂNG TỐC ĐỘ THANH TRƯỢT (paddleSpeed) LÊN THÊM 2 ĐƠN VỊ
+// Tốc độ thanh trượt đã được tăng cường
 const DIFFICULTY_SETTINGS = {
-    // Thanh trượt RẤT nhạy (paddleSpeed), Tốc độ bóng ổn định (ballSpeed)
-    easy: { ballSpeed: 2, paddleSpeed: 15, scoreLimit: 5 }, 
-    medium: { ballSpeed: 3, paddleSpeed: 15, scoreLimit: 7 }, 
-    hard: { ballSpeed: 4, paddleSpeed: 15, scoreLimit: 10 } 
+    easy: { ballSpeed: 2, paddleSpeed: 18, scoreLimit: 5 }, 
+    medium: { ballSpeed: 3, paddleSpeed: 18, scoreLimit: 7 }, 
+    hard: { ballSpeed: 4, paddleSpeed: 18, scoreLimit: 10 } 
 };
 
 let rooms = {};
@@ -156,6 +155,7 @@ io.on('connection', (socket) => {
         const difficulty = data.difficulty || 'medium'; 
         const settings = DIFFICULTY_SETTINGS[difficulty];
 
+        // --- Logic Ghép trận Ngẫu nhiên ---
         if (roomId === 'RANDOM_MATCH') {
             if (waitingRoomId && rooms[waitingRoomId] && rooms[waitingRoomId].playerCount === 1) {
                 roomId = waitingRoomId;
@@ -165,6 +165,7 @@ io.on('connection', (socket) => {
                 waitingRoomId = roomId; 
             }
         }
+        // ----------------------------------------
 
         if (rooms[roomId] && rooms[roomId].playerCount >= 2) {
             socket.emit('roomFull');
@@ -174,8 +175,14 @@ io.on('connection', (socket) => {
             return;
         }
 
+        const isExistingWaitingRoom = rooms[roomId] && rooms[roomId].playerCount === 1 && rooms[roomId].player2 === null;
+        
         if (!rooms[roomId]) {
             rooms[roomId] = createGameState(roomId, settings);
+        } else if (isExistingWaitingRoom) {
+            rooms[roomId].scoreLimit = settings.scoreLimit;
+            rooms[roomId].paddleSpeed = settings.paddleSpeed;
+            rooms[roomId].originalBallSpeed = settings.ballSpeed;
         }
 
         currentRoomId = roomId;
@@ -192,14 +199,14 @@ io.on('connection', (socket) => {
         } else if (room.playerCount === 2) {
             room.player2 = socket.id;
             
-            if (!room.isGameOver) { 
+            if (room.isGameOver || isExistingWaitingRoom) { 
+                 io.to(roomId).emit('gameState', room); 
+            } else {
                  room.isGameRunning = true; 
                  io.to(roomId).emit('gameStart', room); 
                  if (!room.interval) {
                     room.interval = setInterval(() => gameLoop(room), 1000 / 60); 
                  }
-            } else {
-                 io.to(roomId).emit('gameState', room); 
             }
             
             socket.emit('playerAssignment', { player: 2, roomId: roomId });
@@ -226,34 +233,49 @@ io.on('connection', (socket) => {
         }
     });
 
-    // LOGIC CHƠI LẠI (SẴN SÀNG)
+    // --- LOGIC CHƠI LẠI (SẴN SÀNG) ---
     socket.on('playerReady', () => {
         if (!currentRoomId || !rooms[currentRoomId]) return;
 
         const room = rooms[currentRoomId];
 
-        if (room.isGameOver && room.playerCount === 2) {
-            let player = null;
-            if (socket.id === room.player1) {
-                room.readyToRestart.player1 = true;
-                player = 1;
-            } else if (socket.id === room.player2) {
-                room.readyToRestart.player2 = true;
-                player = 2;
-            }
+        if (!room.isGameOver) return; 
+
+        let player = null;
+        if (socket.id === room.player1) {
+            room.readyToRestart.player1 = true;
+            player = 1;
+        } else if (socket.id === room.player2) {
+            room.readyToRestart.player2 = true;
+            player = 2;
+        }
+
+        // 1. Chơi lại với đối thủ cũ (playerCount === 2)
+        if (room.playerCount === 2) {
             
             if (room.readyToRestart.player1 && room.readyToRestart.player2) {
                 startGame(room);
             } else if (player) {
-                // Gửi thông báo cho người chơi vừa nhấn
                 io.to(socket.id).emit('serverMessage', { message: "Bạn đã sẵn sàng. Đang chờ đối thủ..." });
                 
-                // Gửi thông báo cho người chơi còn lại
                 const otherPlayerId = (player === 1) ? room.player2 : room.player1;
                 io.to(otherPlayerId).emit('serverMessage', { message: "Đối thủ đã sẵn sàng. Nhấn SPACE để tham gia trận mới!" });
             }
+        
+        // 2. Chuyển sang chờ đối thủ mới (playerCount === 1)
+        } else if (room.playerCount === 1) {
+            if (socket.id === room.player1) {
+                room.isGameOver = false; 
+                room.isGameRunning = false;
+                room.readyToRestart = { player1: false, player2: false };
+                
+                waitingRoomId = currentRoomId; 
+                
+                io.to(socket.id).emit('serverMessage', { message: `Đã sẵn sàng. Đang tìm đối thủ mới... ID phòng: ${currentRoomId}` });
+            }
         }
     });
+    // ------------------------------------------
     
     socket.on('disconnect', () => {
         if (!currentRoomId || !rooms[currentRoomId]) return;
@@ -271,14 +293,14 @@ io.on('connection', (socket) => {
             room.isGameRunning = false;
             room.isGameOver = true; 
             
-            // Đặt lại trạng thái phòng và gán lại Player 1
             const remainingPlayerId = (socket.id === room.player1) ? room.player2 : room.player1;
             
             room.player1 = remainingPlayerId;
             room.player2 = null; 
             room.readyToRestart = { player1: false, player2: false };
             
-            io.to(remainingPlayerId).emit('serverMessage', { message: "Đối thủ đã rời phòng. Đang chờ người chơi mới..." });
+            // Thông báo cho người chơi còn lại biết cần nhấn SPACE để tiếp tục
+            io.to(remainingPlayerId).emit('serverMessage', { message: "Đối thủ đã rời phòng. Đang chờ người chơi mới... (Nhấn SPACE để tiếp tục)" });
         }
     });
 });
