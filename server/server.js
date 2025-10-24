@@ -16,12 +16,12 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // THIẾT LẬP VÀ BIẾN TOÀN CỤC
 // =========================================================================
 
-// THIẾT LẬP ĐỘ KHÓ ĐÃ CÂN BẰNG (Thanh trượt nhạy hơn, bóng chậm hơn)
+// THIẾT LẬP ĐỘ KHÓ CUỐI CÙNG (Tốc độ bóng ổn định, không tăng sau va chạm)
 const DIFFICULTY_SETTINGS = {
-    // ballSpeed: tốc độ bóng; paddleSpeed: tốc độ thanh trượt (đã tăng)
-    easy: { ballSpeed: 3, paddleSpeed: 8, scoreLimit: 5 }, 
-    medium: { ballSpeed: 4, paddleSpeed: 7, scoreLimit: 7 }, 
-    hard: { ballSpeed: 5, paddleSpeed: 6, scoreLimit: 10 } 
+    // Tốc độ bóng thấp và ổn định (ballSpeed), Thanh trượt nhạy (paddleSpeed)
+    easy: { ballSpeed: 2, paddleSpeed: 8, scoreLimit: 5 }, 
+    medium: { ballSpeed: 3, paddleSpeed: 7, scoreLimit: 7 }, 
+    hard: { ballSpeed: 4, paddleSpeed: 6, scoreLimit: 10 } 
 };
 
 let rooms = {};
@@ -79,13 +79,15 @@ function gameLoop(room) {
         room.ballY >= room.player1Y && 
         room.ballY <= room.player1Y + PADDLE_HEIGHT) {
         
-        room.ballDX *= -1.1; // Tăng tốc độ bóng sau mỗi lần va chạm
+        // **ĐÃ BỎ CƠ CHẾ TĂNG TỐC BÓNG (Không có room.ballDX *= -1.1)**
+        room.ballDX *= -1; // Chỉ đảo ngược hướng X, tốc độ giữ nguyên
         room.ballX = PADDLE_WIDTH + 1; 
         
         // Tính toán góc nảy
         let relativeIntersectY = (room.player1Y + (PADDLE_HEIGHT / 2)) - room.ballY;
         let normalizedRelativeIntersectionY = (relativeIntersectY / (PADDLE_HEIGHT / 2));
-        room.ballDY = normalizedRelativeIntersectionY * room.paddleSpeed; 
+        // Sử dụng lại tốc độ X (đã đảo ngược) cho thành phần Y để duy trì tốc độ
+        room.ballDY = normalizedRelativeIntersectionY * Math.abs(room.ballDX); 
         
         room.colorIndex = (room.colorIndex + 1) % 7; 
     }
@@ -95,13 +97,15 @@ function gameLoop(room) {
         room.ballY >= room.player2Y && 
         room.ballY <= room.player2Y + PADDLE_HEIGHT) {
         
-        room.ballDX *= -1.1; 
+        // **ĐÃ BỎ CƠ CHẾ TĂNG TỐC BÓNG**
+        room.ballDX *= -1; // Chỉ đảo ngược hướng X, tốc độ giữ nguyên
         room.ballX = CANVAS_WIDTH - PADDLE_WIDTH - 1; 
 
         // Tính toán góc nảy
         let relativeIntersectY = (room.player2Y + (PADDLE_HEIGHT / 2)) - room.ballY;
         let normalizedRelativeIntersectionY = (relativeIntersectY / (PADDLE_HEIGHT / 2));
-        room.ballDY = normalizedRelativeIntersectionY * room.paddleSpeed; 
+        // Sử dụng lại tốc độ X (đã đảo ngược) cho thành phần Y để duy trì tốc độ
+        room.ballDY = normalizedRelativeIntersectionY * Math.abs(room.ballDX); 
 
         room.colorIndex = (room.colorIndex + 1) % 7; 
     }
@@ -182,11 +186,8 @@ io.on('connection', (socket) => {
             room.player2 = socket.id;
             room.isGameRunning = true; 
             
-            // Gán lại Player 2 (socket hiện tại) nếu Player 1 đã vào trước.
-            // Nếu P2 là socket hiện tại, gửi lại thông tin P2 cho socket này.
             socket.emit('playerAssignment', { player: 2, roomId: roomId });
             
-            // Gửi gameStart cho cả phòng
             io.to(roomId).emit('gameStart', room); 
             
             if (roomId === waitingRoomId) {
@@ -207,7 +208,6 @@ io.on('connection', (socket) => {
         const room = rooms[currentRoomId];
         let newY = data.y;
         
-        // Đảm bảo thanh trượt không vượt quá biên
         if (newY < 0) newY = 0;
         if (newY > CANVAS_HEIGHT - PADDLE_HEIGHT) newY = CANVAS_HEIGHT - PADDLE_HEIGHT;
 
@@ -251,7 +251,6 @@ io.on('connection', (socket) => {
             room.isGameRunning = false;
             room.isGameOver = true; 
             
-            // Gán lại người chơi còn lại thành Player 1
             room.player1 = (socket.id === room.player1) ? room.player2 : room.player1;
             room.player2 = null; 
             
