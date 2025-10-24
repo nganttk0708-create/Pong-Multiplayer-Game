@@ -19,9 +19,9 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // ĐÃ TĂNG TỐC ĐỘ THANH TRƯỢT (paddleSpeed) LÊN THÊM 2 ĐƠN VỊ
 const DIFFICULTY_SETTINGS = {
     // Thanh trượt RẤT nhạy (paddleSpeed), Tốc độ bóng ổn định (ballSpeed)
-    easy: { ballSpeed: 2, paddleSpeed: 10, scoreLimit: 5 }, 
-    medium: { ballSpeed: 3, paddleSpeed: 9, scoreLimit: 7 }, 
-    hard: { ballSpeed: 4, paddleSpeed: 8, scoreLimit: 10 } 
+    easy: { ballSpeed: 2, paddleSpeed: 15, scoreLimit: 5 }, 
+    medium: { ballSpeed: 3, paddleSpeed: 15, scoreLimit: 7 }, 
+    hard: { ballSpeed: 4, paddleSpeed: 15, scoreLimit: 10 } 
 };
 
 let rooms = {};

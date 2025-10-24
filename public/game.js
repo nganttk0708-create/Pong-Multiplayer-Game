@@ -86,7 +86,7 @@ socket.on('serverMessage', (data) => {
 document.addEventListener('keydown', (e) => {
     keys[e.key] = true;
     
-    // SỬA: Gửi tín hiệu 'playerReady' khi nhấn SPACE và game over
+    // Gửi tín hiệu 'playerReady' khi nhấn SPACE và game over
     if (e.key === ' ' && gameState && gameState.isGameOver) {
         socket.emit('playerReady');
     }
@@ -106,21 +106,16 @@ function gameLoopClient() {
     drawGame(gameState);
 
     if (gameState.isGameOver) {
-        // Kiểm tra xem cả hai đã sẵn sàng chưa để hiển thị thông báo chính xác
-        let ready1 = gameState.readyToRestart.player1;
-        let ready2 = gameState.readyToRestart.player2;
+        msgDiv.style.display = 'block';
         
+        // **ĐÃ SỬA: LUÔN HIỂN THỊ THÔNG BÁO CHO NGƯỜI CHƠI NHẤN SPACE**
         const winner = gameState.score.player1 > gameState.score.player2 ? "NGƯỜI CHƠI 1" : "NGƯỜI CHƠI 2";
         
-        if (ready1 && ready2) {
-            // Trường hợp này không xảy ra vì game đã bắt đầu lại
-        } else if (ready1 || ready2) {
-             // Thông báo đang chờ người còn lại (sẽ được server gửi qua serverMessage)
-        } else {
-             // Thông báo chung
+        // Nếu người chơi chưa sẵn sàng, hiển thị thông báo chung
+        if (!gameState.readyToRestart.player1 || !gameState.readyToRestart.player2) {
              msgDiv.textContent = `${winner} THẮNG! NHẤN SPACE để chơi lại`;
         }
-        msgDiv.style.display = 'block';
+        // Khi một người đã nhấn, server sẽ gửi lại thông báo cụ thể (qua serverMessage)
     }
 
     requestAnimationFrame(gameLoopClient);
