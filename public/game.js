@@ -23,7 +23,6 @@ const RAINBOW_COLORS = [
 // XỬ LÝ SỰ KIỆN LOBBY (JOIN ROOM / RANDOM MATCH)
 // =========================================================================
 
-// --- Logic Tham gia Phòng Riêng ---
 joinButton.addEventListener('click', () => {
     const roomId = roomIdInput.value.trim();
     const difficulty = difficultySelect.value;
@@ -40,7 +39,6 @@ joinButton.addEventListener('click', () => {
     }
 });
 
-// --- Logic Tìm Trận Ngẫu Nhiên ---
 randomButton.addEventListener('click', () => {
     const difficulty = difficultySelect.value;
     
@@ -71,7 +69,7 @@ socket.on('roomFull', () => {
 socket.on('gameStart', (state) => {
     gameState = state;
     msgDiv.style.display = 'none';
-    requestAnimationFrame(gameLoopClient);
+    requestAnimationFrame(gameLoopClient); // Bắt đầu vòng lặp game
 });
 
 socket.on('gameState', (state) => {
@@ -96,25 +94,30 @@ document.addEventListener('keyup', (e) => {
 });
 
 function gameLoopClient() {
-    if (!gameState) return;
+    if (!gameState) {
+        requestAnimationFrame(gameLoopClient);
+        return;
+    }
 
+    // Luôn cập nhật vị trí thanh trượt
     updatePlayerMovement(); 
 
+    // Vẽ Game
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
     drawGame(gameState);
 
+    // Xử lý thông báo
     if (gameState.isGameOver) {
         msgDiv.style.display = 'block';
         
         const winner = gameState.score.player1 > gameState.score.player2 ? "NGƯỜI CHƠI 1" : "NGƯỜI CHƠI 2";
         
-        // Luôn hiển thị thông báo chiến thắng và yêu cầu nhấn SPACE, trừ khi server gửi thông báo khác
+        // Chỉ hiển thị thông báo chiến thắng nếu đối thủ còn trong phòng và chưa sẵn sàng
         if (gameState.playerCount === 2 && (!gameState.readyToRestart.player1 || !gameState.readyToRestart.player2)) {
              msgDiv.textContent = `${winner} THẮNG! NHẤN SPACE để chơi lại`;
         }
-        // Lưu ý: Nếu playerCount === 1, server sẽ gửi thông báo qua 'serverMessage'
+        // Lưu ý: Nếu playerCount === 1 hoặc cả hai đã sẵn sàng, thông báo được xử lý qua 'serverMessage'
         
     } else if (gameState.isGameRunning) {
         msgDiv.style.display = 'none';
@@ -125,7 +128,7 @@ function gameLoopClient() {
 }
 
 function updatePlayerMovement() {
-    if (!playerNumber || !gameState) return;
+    if (!playerNumber || !gameState || gameState.isGameOver) return; // Không di chuyển nếu game over
     
     let currentY = (playerNumber === 1) ? gameState.player1Y : gameState.player2Y;
     let newY = currentY;

@@ -17,9 +17,9 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // =========================================================================
 
 const DIFFICULTY_SETTINGS = {
-    easy: { ballSpeed: 2, paddleSpeed: 18, scoreLimit: 5 }, 
-    medium: { ballSpeed: 3, paddleSpeed: 18, scoreLimit: 7 }, 
-    hard: { ballSpeed: 4, paddleSpeed: 18, scoreLimit: 10 } 
+    easy: { ballSpeed: 2, paddleSpeed: 10, scoreLimit: 5 }, 
+    medium: { ballSpeed: 3, paddleSpeed: 9, scoreLimit: 7 }, 
+    hard: { ballSpeed: 4, paddleSpeed: 8, scoreLimit: 10 } 
 };
 
 let rooms = {};
@@ -65,7 +65,7 @@ function resetBall(room) {
 }
 
 function startGame(room) {
-    // 1. Dọn dẹp interval cũ
+    // 1. Dọn dẹp interval cũ trước khi bắt đầu game mới để tránh vòng lặp kép
     if (room.interval) {
         clearInterval(room.interval);
         room.interval = null;
@@ -93,8 +93,6 @@ function gameLoop(room) {
         }
         return;
     }
-
-    // [Code game loop còn lại không đổi]
 
     // 1. Di chuyển bóng
     room.ballX += room.ballDX;
@@ -150,6 +148,7 @@ function gameLoop(room) {
         if (room.score.player1 >= room.scoreLimit || room.score.player2 >= room.scoreLimit) {
             room.isGameOver = true;
             room.isGameRunning = false;
+            // Dừng interval khi game over
             if (room.interval) {
                 clearInterval(room.interval);
                 room.interval = null;
@@ -172,6 +171,7 @@ io.on('connection', (socket) => {
         const difficulty = data.difficulty || 'medium'; 
         const settings = DIFFICULTY_SETTINGS[difficulty];
 
+        // Logic Ghép trận Ngẫu nhiên
         if (roomId === 'RANDOM_MATCH') {
             if (waitingRoomId && rooms[waitingRoomId] && rooms[waitingRoomId].playerCount === 1) {
                 roomId = waitingRoomId;
@@ -195,6 +195,7 @@ io.on('connection', (socket) => {
         if (!rooms[roomId]) {
             rooms[roomId] = createGameState(roomId, settings);
         } else if (isExistingWaitingRoom) {
+            // Cập nhật cài đặt nếu phòng chờ đã tồn tại
             rooms[roomId].scoreLimit = settings.scoreLimit;
             rooms[roomId].paddleSpeed = settings.paddleSpeed;
             rooms[roomId].originalBallSpeed = settings.ballSpeed;
@@ -220,16 +221,15 @@ io.on('connection', (socket) => {
                 waitingRoomId = null;
             }
 
-            // --- ĐOẠN LOGIC BẮT ĐẦU GAME ĐƯỢC SỬA ---
-            // Nếu game đã kết thúc (người chơi cũ vừa chơi lại) hoặc phòng đang chờ (người chơi mới tham gia phòng chờ)
+            // LOGIC BẮT ĐẦU GAME KHI ĐỦ 2 NGƯỜI CHƠI
             if (room.isGameOver || isExistingWaitingRoom) { 
-                 // Chỉ gửi trạng thái game để người chơi biết cần nhấn SPACE hoặc đợi
+                 // Nếu phòng là Game Over (trận trước) HOẶC là Phòng chờ (người chơi 1 đang chờ)
+                 // Gửi trạng thái để client thấy cần nhấn SPACE để sẵn sàng
                  io.to(roomId).emit('gameState', room); 
             } else {
                  // Đây là trận đấu MỚI (không phải chơi lại), BẮT ĐẦU GAME NGAY LẬP TỨC
                  startGame(room); 
             }
-            // ----------------------------------------
         }
     });
 
@@ -300,22 +300,26 @@ io.on('connection', (socket) => {
         room.playerCount--;
 
         if (room.playerCount <= 0) {
-            clearInterval(room.interval);
+            // Dọn dẹp hoàn toàn
+            if (room.interval) clearInterval(room.interval);
             delete rooms[currentRoomId];
             if (currentRoomId === waitingRoomId) {
                 waitingRoomId = null;
             }
         } else if (room.playerCount === 1) {
+            // Dừng vòng lặp game hiện tại
             if (room.interval) {
                 clearInterval(room.interval);
                 room.interval = null;
             }
             
+            // Đặt phòng về trạng thái Game Over để kích hoạt logic READY
             room.isGameRunning = false;
             room.isGameOver = true; 
             
             const remainingPlayerId = (socket.id === room.player1) ? room.player2 : room.player1;
             
+            // Gán lại người chơi còn lại thành player 1 để đơn giản hóa logic
             room.player1 = remainingPlayerId;
             room.player2 = null; 
             room.readyToRestart = { player1: false, player2: false };
