@@ -19,9 +19,9 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // THIẾT LẬP ĐỘ KHÓ ỔN ĐỊNH: Tốc độ bóng thấp, Thanh trượt nhạy
 const DIFFICULTY_SETTINGS = {
     // Tốc độ bóng ổn định (ballSpeed), Thanh trượt nhạy (paddleSpeed)
-    easy: { ballSpeed: 2, paddleSpeed: 8, scoreLimit: 5 }, 
-    medium: { ballSpeed: 3, paddleSpeed: 7, scoreLimit: 7 }, 
-    hard: { ballSpeed: 4, paddleSpeed: 6, scoreLimit: 10 } 
+    easy: { ballSpeed: 2, paddleSpeed: 18, scoreLimit: 5 }, 
+    medium: { ballSpeed: 3, paddleSpeed: 18, scoreLimit: 7 }, 
+    hard: { ballSpeed: 4, paddleSpeed: 18, scoreLimit: 10 } 
 };
 
 let rooms = {};
