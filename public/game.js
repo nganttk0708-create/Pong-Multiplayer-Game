@@ -23,6 +23,7 @@ const RAINBOW_COLORS = [
 // XỬ LÝ SỰ KIỆN LOBBY (JOIN ROOM / RANDOM MATCH)
 // =========================================================================
 
+// --- Logic Tham gia Phòng Riêng ---
 joinButton.addEventListener('click', () => {
     const roomId = roomIdInput.value.trim();
     const difficulty = difficultySelect.value;
@@ -39,6 +40,7 @@ joinButton.addEventListener('click', () => {
     }
 });
 
+// --- Logic Tìm Trận Ngẫu Nhiên ---
 randomButton.addEventListener('click', () => {
     const difficulty = difficultySelect.value;
     
@@ -69,7 +71,7 @@ socket.on('roomFull', () => {
 socket.on('gameStart', (state) => {
     gameState = state;
     msgDiv.style.display = 'none';
-    requestAnimationFrame(gameLoopClient); // Bắt đầu vòng lặp game
+    requestAnimationFrame(gameLoopClient);
 });
 
 socket.on('gameState', (state) => {
@@ -84,9 +86,8 @@ socket.on('serverMessage', (data) => {
 document.addEventListener('keydown', (e) => {
     keys[e.key] = true;
     
-    // Gửi tín hiệu 'playerReady' khi nhấn SPACE và game over
     if (e.key === ' ' && gameState && gameState.isGameOver) {
-        socket.emit('playerReady');
+        socket.emit('restartGame');
     }
 });
 document.addEventListener('keyup', (e) => {
@@ -94,41 +95,26 @@ document.addEventListener('keyup', (e) => {
 });
 
 function gameLoopClient() {
-    if (!gameState) {
-        requestAnimationFrame(gameLoopClient);
-        return;
-    }
+    if (!gameState) return;
 
-    // Luôn cập nhật vị trí thanh trượt
     updatePlayerMovement(); 
 
-    // Vẽ Game
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
     drawGame(gameState);
 
-    // Xử lý thông báo
     if (gameState.isGameOver) {
         msgDiv.style.display = 'block';
-        
         const winner = gameState.score.player1 > gameState.score.player2 ? "NGƯỜI CHƠI 1" : "NGƯỜI CHƠI 2";
-        
-        // Chỉ hiển thị thông báo chiến thắng nếu đối thủ còn trong phòng và chưa sẵn sàng
-        if (gameState.playerCount === 2 && (!gameState.readyToRestart.player1 || !gameState.readyToRestart.player2)) {
-             msgDiv.textContent = `${winner} THẮNG! NHẤN SPACE để chơi lại`;
-        }
-        // Lưu ý: Nếu playerCount === 1 hoặc cả hai đã sẵn sàng, thông báo được xử lý qua 'serverMessage'
-        
-    } else if (gameState.isGameRunning) {
-        msgDiv.style.display = 'none';
+        msgDiv.textContent = `${winner} THẮNG! NHẤN SPACE để chơi lại`;
     }
-
 
     requestAnimationFrame(gameLoopClient);
 }
 
 function updatePlayerMovement() {
-    if (!playerNumber || !gameState || gameState.isGameOver) return; // Không di chuyển nếu game over
+    if (!playerNumber || !gameState) return;
     
     let currentY = (playerNumber === 1) ? gameState.player1Y : gameState.player2Y;
     let newY = currentY;

@@ -16,14 +16,16 @@ app.use(express.static(path.join(__dirname, '..', 'public')));
 // THIẾT LẬP VÀ BIẾN TOÀN CỤC
 // =========================================================================
 
+// THIẾT LẬP ĐỘ KHÓ ỔN ĐỊNH: Tốc độ bóng thấp, Thanh trượt nhạy
 const DIFFICULTY_SETTINGS = {
-    easy: { ballSpeed: 2, paddleSpeed: 10, scoreLimit: 5 }, 
-    medium: { ballSpeed: 3, paddleSpeed: 9, scoreLimit: 7 }, 
-    hard: { ballSpeed: 4, paddleSpeed: 8, scoreLimit: 10 } 
+    // Tốc độ bóng ổn định (ballSpeed), Thanh trượt nhạy (paddleSpeed)
+    easy: { ballSpeed: 2, paddleSpeed: 8, scoreLimit: 5 }, 
+    medium: { ballSpeed: 3, paddleSpeed: 7, scoreLimit: 7 }, 
+    hard: { ballSpeed: 4, paddleSpeed: 6, scoreLimit: 10 } 
 };
 
 let rooms = {};
-let waitingRoomId = null; 
+let waitingRoomId = null; // ID của phòng đang chờ người chơi ngẫu nhiên thứ 2
 
 const PADDLE_HEIGHT = 80;
 const PADDLE_WIDTH = 10;
@@ -47,10 +49,10 @@ function createGameState(roomId, settings) {
         isGameOver: false,
         scoreLimit: settings.scoreLimit, 
         paddleSpeed: settings.paddleSpeed, 
+        // LƯU TRỮ TỐC ĐỘ BÓNG BAN ĐẦU ĐỂ DÙNG TRONG HÀM RESET
         originalBallSpeed: settings.ballSpeed, 
-        readyToRestart: { player1: false, player2: false }, 
         colorIndex: 0,
-        interval: null 
+        interval: null // Lưu trữ Game Loop Interval ID
     };
 }
 
@@ -58,41 +60,16 @@ function resetBall(room) {
     room.ballX = CANVAS_WIDTH / 2;
     room.ballY = CANVAS_HEIGHT / 2;
     
+    // SỬ DỤNG originalBallSpeed ĐỂ ĐẶT LẠI TỐC ĐỘ (FIX LỖI)
     const speedMagnitude = room.originalBallSpeed; 
 
+    // Đảo hướng sau khi ghi điểm và dùng tốc độ ổn định
     room.ballDX = (room.ballDX > 0 ? -1 : 1) * speedMagnitude;
     room.ballDY = speedMagnitude * (Math.random() > 0.5 ? 1 : -1);
 }
 
-function startGame(room) {
-    // 1. Dọn dẹp interval cũ trước khi bắt đầu game mới để tránh vòng lặp kép
-    if (room.interval) {
-        clearInterval(room.interval);
-        room.interval = null;
-    }
-    
-    // 2. Reset trạng thái
-    resetBall(room);
-    room.score = { player1: 0, player2: 0 };
-    room.isGameOver = false;
-    room.isGameRunning = true;
-    room.readyToRestart = { player1: false, player2: false }; 
-    room.colorIndex = 0; 
-    
-    // 3. Khởi tạo vòng lặp game mới
-    room.interval = setInterval(() => gameLoop(room), 1000 / 60); 
-    
-    io.to(room.id).emit('gameStart', room); 
-}
-
 function gameLoop(room) {
-    if (!room.isGameRunning) {
-        if (room.interval) {
-            clearInterval(room.interval);
-            room.interval = null;
-        }
-        return;
-    }
+    if (!room.isGameRunning) return;
 
     // 1. Di chuyển bóng
     room.ballX += room.ballDX;
@@ -108,9 +85,10 @@ function gameLoop(room) {
         room.ballY >= room.player1Y && 
         room.ballY <= room.player1Y + PADDLE_HEIGHT) {
         
-        room.ballDX *= -1; 
+        room.ballDX *= -1; // Chỉ đảo ngược hướng X, tốc độ giữ nguyên
         room.ballX = PADDLE_WIDTH + 1; 
         
+        // Tính toán góc nảy
         let relativeIntersectY = (room.player1Y + (PADDLE_HEIGHT / 2)) - room.ballY;
         let normalizedRelativeIntersectionY = (relativeIntersectY / (PADDLE_HEIGHT / 2));
         room.ballDY = normalizedRelativeIntersectionY * Math.abs(room.ballDX); 
@@ -123,9 +101,10 @@ function gameLoop(room) {
         room.ballY >= room.player2Y && 
         room.ballY <= room.player2Y + PADDLE_HEIGHT) {
         
-        room.ballDX *= -1; 
+        room.ballDX *= -1; // Chỉ đảo ngược hướng X, tốc độ giữ nguyên
         room.ballX = CANVAS_WIDTH - PADDLE_WIDTH - 1; 
 
+        // Tính toán góc nảy
         let relativeIntersectY = (room.player2Y + (PADDLE_HEIGHT / 2)) - room.ballY;
         let normalizedRelativeIntersectionY = (relativeIntersectY / (PADDLE_HEIGHT / 2));
         room.ballDY = normalizedRelativeIntersectionY * Math.abs(room.ballDX); 
@@ -148,11 +127,6 @@ function gameLoop(room) {
         if (room.score.player1 >= room.scoreLimit || room.score.player2 >= room.scoreLimit) {
             room.isGameOver = true;
             room.isGameRunning = false;
-            // Dừng interval khi game over
-            if (room.interval) {
-                clearInterval(room.interval);
-                room.interval = null;
-            }
         }
     }
 
@@ -171,7 +145,7 @@ io.on('connection', (socket) => {
         const difficulty = data.difficulty || 'medium'; 
         const settings = DIFFICULTY_SETTINGS[difficulty];
 
-        // Logic Ghép trận Ngẫu nhiên
+        // --- LOGIC GHÉP TRẬN NGẪU NHIÊN ---
         if (roomId === 'RANDOM_MATCH') {
             if (waitingRoomId && rooms[waitingRoomId] && rooms[waitingRoomId].playerCount === 1) {
                 roomId = waitingRoomId;
@@ -181,7 +155,9 @@ io.on('connection', (socket) => {
                 waitingRoomId = roomId; 
             }
         }
+        // ----------------------------------------
 
+        // 1. Kiểm tra giới hạn phòng
         if (rooms[roomId] && rooms[roomId].playerCount >= 2) {
             socket.emit('roomFull');
             if (roomId === waitingRoomId) {
@@ -190,23 +166,19 @@ io.on('connection', (socket) => {
             return;
         }
 
-        const isExistingWaitingRoom = rooms[roomId] && rooms[roomId].playerCount === 1 && rooms[roomId].player2 === null;
-        
+        // 2. Khởi tạo phòng nếu là phòng mới
         if (!rooms[roomId]) {
             rooms[roomId] = createGameState(roomId, settings);
-        } else if (isExistingWaitingRoom) {
-            // Cập nhật cài đặt nếu phòng chờ đã tồn tại
-            rooms[roomId].scoreLimit = settings.scoreLimit;
-            rooms[roomId].paddleSpeed = settings.paddleSpeed;
-            rooms[roomId].originalBallSpeed = settings.ballSpeed;
         }
 
+        // 3. Tham gia phòng
         currentRoomId = roomId;
         socket.join(roomId);
         
         const room = rooms[roomId];
         room.playerCount++;
 
+        // 4. Gán người chơi
         if (room.playerCount === 1) {
             room.player1 = socket.id;
             socket.emit('playerAssignment', { player: 1, roomId: roomId });
@@ -214,25 +186,24 @@ io.on('connection', (socket) => {
 
         } else if (room.playerCount === 2) {
             room.player2 = socket.id;
+            room.isGameRunning = true; 
             
             socket.emit('playerAssignment', { player: 2, roomId: roomId });
+            
+            io.to(roomId).emit('gameStart', room); 
             
             if (roomId === waitingRoomId) {
                 waitingRoomId = null;
             }
-
-            // LOGIC BẮT ĐẦU GAME KHI ĐỦ 2 NGƯỜI CHƠI
-            if (room.isGameOver || isExistingWaitingRoom) { 
-                 // Nếu phòng là Game Over (trận trước) HOẶC là Phòng chờ (người chơi 1 đang chờ)
-                 // Gửi trạng thái để client thấy cần nhấn SPACE để sẵn sàng
-                 io.to(roomId).emit('gameState', room); 
-            } else {
-                 // Đây là trận đấu MỚI (không phải chơi lại), BẮT ĐẦU GAME NGAY LẬP TỨC
-                 startGame(room); 
+            
+            // Khởi động Game Loop chỉ 1 lần cho phòng
+            if (!room.interval) {
+                room.interval = setInterval(() => gameLoop(room), 1000 / 60); 
             }
         }
     });
 
+    // --- Di chuyển thanh trượt (Handle Paddle Movement) ---
     socket.on('move', (data) => {
         if (!currentRoomId || !rooms[currentRoomId] || rooms[currentRoomId].isGameOver) return;
         
@@ -249,50 +220,23 @@ io.on('connection', (socket) => {
         }
     });
 
-    // --- LOGIC CHƠI LẠI (SẴN SÀNG) ---
-    socket.on('playerReady', () => {
+    // --- Chơi lại game (Restart Game) ---
+    socket.on('restartGame', () => {
         if (!currentRoomId || !rooms[currentRoomId]) return;
 
         const room = rooms[currentRoomId];
-
-        if (!room.isGameOver) return; 
-
-        let player = null;
-        if (socket.id === room.player1) {
-            room.readyToRestart.player1 = true;
-            player = 1;
-        } else if (socket.id === room.player2) {
-            room.readyToRestart.player2 = true;
-            player = 2;
-        }
-
-        // 1. Chơi lại với đối thủ cũ (playerCount === 2)
-        if (room.playerCount === 2) {
-            
-            if (room.readyToRestart.player1 && room.readyToRestart.player2) {
-                startGame(room); 
-            } else if (player) {
-                io.to(socket.id).emit('serverMessage', { message: "Bạn đã sẵn sàng. Đang chờ đối thủ..." });
-                
-                const otherPlayerId = (player === 1) ? room.player2 : room.player1;
-                io.to(otherPlayerId).emit('serverMessage', { message: "Đối thủ đã sẵn sàng. Nhấn SPACE để tham gia trận mới!" });
-            }
         
-        // 2. Chuyển sang chờ đối thủ mới (playerCount === 1)
-        } else if (room.playerCount === 1) {
-            if (socket.id === room.player1) {
-                room.isGameOver = false; 
-                room.isGameRunning = false;
-                room.readyToRestart = { player1: false, player2: false };
-                
-                waitingRoomId = currentRoomId; 
-                
-                io.to(socket.id).emit('serverMessage', { message: `Đã sẵn sàng. Đang tìm đối thủ mới... ID phòng: ${currentRoomId}` });
-            }
+        if (room.isGameOver && room.playerCount === 2) { 
+            resetBall(room);
+            room.score = { player1: 0, player2: 0 };
+            room.isGameOver = false;
+            room.isGameRunning = true;
+            room.colorIndex = 0; 
+            io.to(currentRoomId).emit('gameState', room);
         }
     });
-    // ------------------------------------------
-    
+
+    // --- Ngắt kết nối (Disconnection) ---
     socket.on('disconnect', () => {
         if (!currentRoomId || !rooms[currentRoomId]) return;
 
@@ -300,31 +244,19 @@ io.on('connection', (socket) => {
         room.playerCount--;
 
         if (room.playerCount <= 0) {
-            // Dọn dẹp hoàn toàn
-            if (room.interval) clearInterval(room.interval);
+            clearInterval(room.interval);
             delete rooms[currentRoomId];
             if (currentRoomId === waitingRoomId) {
                 waitingRoomId = null;
             }
         } else if (room.playerCount === 1) {
-            // Dừng vòng lặp game hiện tại
-            if (room.interval) {
-                clearInterval(room.interval);
-                room.interval = null;
-            }
-            
-            // Đặt phòng về trạng thái Game Over để kích hoạt logic READY
             room.isGameRunning = false;
             room.isGameOver = true; 
             
-            const remainingPlayerId = (socket.id === room.player1) ? room.player2 : room.player1;
-            
-            // Gán lại người chơi còn lại thành player 1 để đơn giản hóa logic
-            room.player1 = remainingPlayerId;
+            room.player1 = (socket.id === room.player1) ? room.player2 : room.player1;
             room.player2 = null; 
-            room.readyToRestart = { player1: false, player2: false };
             
-            io.to(remainingPlayerId).emit('serverMessage', { message: "Đối thủ đã rời phòng. Đang chờ người chơi mới... (Nhấn SPACE để tiếp tục)" });
+            io.to(currentRoomId).emit('serverMessage', { message: "Đối thủ đã rời phòng. Đang chờ người chơi mới... (Nhấn SPACE để chơi lại khi có người)" });
         }
     });
 });
