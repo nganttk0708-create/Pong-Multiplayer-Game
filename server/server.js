@@ -7,19 +7,19 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
-// ⚙️ Cấu hình static để client truy cập
+// ⚙️ Cho phép truy cập file tĩnh (index.html, game.js, style.css)
 app.use(express.static(path.join(__dirname, "..", "public")));
 
-const rooms = {};          // Danh sách phòng: { roomCode: [socketId1, socketId2] }
-let waitingPlayer = null;  // Người đang chờ trong chế độ ngẫu nhiên
+const rooms = {};          // Lưu danh sách phòng
+let waitingPlayer = null;  // Người đang chờ chơi ngẫu nhiên
 
 // =============================================================
-// 🔌 XỬ LÝ KẾT NỐI SOCKET.IO
+// 🔌 SOCKET.IO - QUẢN LÝ KẾT NỐI
 // =============================================================
 io.on("connection", (socket) => {
   console.log(`🔵 ${socket.id} đã kết nối`);
 
-  // 🎮 Người chơi tạo phòng riêng
+  // 🎮 Tạo phòng riêng
   socket.on("createRoom", () => {
     const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
     rooms[roomCode] = [socket.id];
@@ -28,7 +28,7 @@ io.on("connection", (socket) => {
     console.log(`📦 ${socket.id} tạo phòng ${roomCode}`);
   });
 
-  // 🔑 Người chơi tham gia phòng riêng
+  // 🔑 Tham gia phòng riêng
   socket.on("joinRoom", (roomCode) => {
     const room = rooms[roomCode];
     if (!room) {
@@ -46,7 +46,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // 🎲 Người chơi chọn “chơi ngẫu nhiên”
+  // 🎲 Chế độ chơi ngẫu nhiên
   socket.on("playRandom", () => {
     if (!waitingPlayer) {
       waitingPlayer = socket;
@@ -68,9 +68,24 @@ io.on("connection", (socket) => {
   // 🚪 Ngắt kết nối
   socket.on("disconnect", () => {
     console.log(`🔴 ${socket.id} đã thoát`);
+
+    // Nếu người này đang chờ — hủy chờ
     if (waitingPlayer && waitingPlayer.id === socket.id) waitingPlayer = null;
 
+    // Xóa khỏi phòng hiện tại
     for (const [code, players] of Object.entries(rooms)) {
       const idx = players.indexOf(socket.id);
       if (idx !== -1) {
-        players.spl
+        players.splice(idx, 1);
+        io.to(code).emit("playerLeft", "❗ Người chơi kia đã thoát!");
+        if (players.length === 0) delete rooms[code];
+      }
+    }
+  });
+});
+
+// =============================================================
+// 🚀 KHỞI ĐỘNG SERVER
+// =============================================================
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => console.log(`✅ Server chạy tại http://localhost:${PORT}`));
