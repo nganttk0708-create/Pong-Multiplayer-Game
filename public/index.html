@@ -1,37 +1,26 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <title>Multiplayer Ping Pong</title>
-    <link rel="stylesheet" href="style.css"> 
+  <meta charset="UTF-8">
+  <title>Ping Pong Online</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div id="menu">
+    <h1>🏓 Ping Pong Online</h1>
+    <button id="startBtn">Vào chơi</button>
+  </div>
 
-    <div id="lobby">
-        <h2>Tham gia Phòng (Join Room)</h2>
-        
-        <input type="text" id="roomIdInput" placeholder="Nhập ID Phòng (VD: Phong123)">
-        
-        <label for="difficultySelect">Chọn Độ Khó:</label>
-        <select id="difficultySelect">
-            <option value="easy">Dễ (Easy)</option>
-            <option value="medium" selected>Trung bình (Medium)</option>
-            <option value="hard">Khó (Hard)</option>
-        </select>
-        
-        <button id="joinButton" class="btn btn-primary">Tham gia Phòng Riêng</button>
-        
-        <div style="margin: 15px 0; font-weight: bold; color: #aaa;">-- HOẶC --</div>
-        
-        <button id="randomButton" class="btn btn-danger">Tìm Trận Ngẫu Nhiên</button>
+  <div id="gameContainer" style="display:none;">
+    <canvas id="gameCanvas" width="900" height="500"></canvas>
+    <div class="buttons">
+      <button id="restartBtn">🔁 Tái đấu</button>
+      <button id="exitBtn">🚪 Thoát</button>
     </div>
+    <p id="statusText"></p>
+  </div>
 
-    <div id="game-container" style="display:none;">
-        <div id="message">Đang chờ người chơi...</div>
-        <canvas id="gameCanvas" width="600" height="400"></canvas>
-    </div>
-
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="game.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="game.js"></script>
 </body>
 </html>

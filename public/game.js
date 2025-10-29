@@ -1,166 +1,107 @@
 const socket = io();
-const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 
-const lobbyDiv = document.getElementById('lobby');
-const gameContainerDiv = document.getElementById('game-container');
-const msgDiv = document.getElementById('message');
+let playerNumber = 0;
+let paddle = { x: 400, y: 470, w: 100, h: 10 };
+let opponent = { x: 400, y: 20, w: 100, h: 10 };
+let ball = { x: 450, y: 250, dx: 4, dy: 4, r: 10 };
+let running = false;
 
-const joinButton = document.getElementById('joinButton');
-const randomButton = document.getElementById('randomButton'); 
-const roomIdInput = document.getElementById('roomIdInput');
-const difficultySelect = document.getElementById('difficultySelect');
+document.getElementById('startBtn').onclick = () => {
+  document.getElementById('menu').style.display = 'none';
+  document.getElementById('gameContainer').style.display = 'block';
+};
 
-let playerNumber = null;
-let gameState = null;
-let keys = {}; 
-const PADDLE_HEIGHT = 80;
-const RAINBOW_COLORS = [
-    '#FF0000', '#FF7F00', '#FFFF00', '#00FF00', '#0000FF', '#4B0082', '#9400D3'
-];
-
-// =========================================================================
-// XỬ LÝ SỰ KIỆN LOBBY (JOIN ROOM / RANDOM MATCH)
-// =========================================================================
-
-// --- Logic Tham gia Phòng Riêng ---
-joinButton.addEventListener('click', () => {
-    const roomId = roomIdInput.value.trim();
-    const difficulty = difficultySelect.value;
-    
-    if (roomId) {
-        lobbyDiv.style.display = 'none'; 
-        gameContainerDiv.style.display = 'block'; 
-        msgDiv.style.display = 'block'; 
-        msgDiv.textContent = 'Đang cố gắng tham gia phòng...';
-        
-        socket.emit('joinRoom', { roomId: roomId, difficulty: difficulty });
-    } else {
-        alert('Vui lòng nhập ID Phòng.');
-    }
+socket.on('playerNumber', (num) => {
+  playerNumber = num;
+  document.getElementById('statusText').textContent = `Bạn là người chơi ${num}`;
 });
 
-// --- Logic Tìm Trận Ngẫu Nhiên ---
-randomButton.addEventListener('click', () => {
-    const difficulty = difficultySelect.value;
-    
-    lobbyDiv.style.display = 'none'; 
-    gameContainerDiv.style.display = 'block'; 
-    msgDiv.style.display = 'block'; 
-    msgDiv.textContent = 'Đang tìm kiếm trận đấu ngẫu nhiên...';
-
-    socket.emit('joinRoom', { roomId: 'RANDOM_MATCH', difficulty: difficulty }); 
-});
-
-// =========================================================================
-// XỬ LÝ SOCKET.IO VÀ GAME LOOP
-// =========================================================================
-
-socket.on('playerAssignment', (data) => {
-    playerNumber = data.player;
-    const playerText = (playerNumber === 1) ? "1 (Trái)" : "2 (Phải)";
-    msgDiv.textContent = `Bạn là Người chơi ${playerText}. Phòng ID: ${data.roomId}. Đang chờ đối thủ...`;
+socket.on('startGame', () => {
+  running = true;
+  gameLoop();
+  document.getElementById('statusText').textContent = "Trận đấu bắt đầu!";
 });
 
 socket.on('roomFull', () => {
-    alert('Phòng đã đầy. Vui lòng chọn phòng khác.');
-    lobbyDiv.style.display = 'block';
-    gameContainerDiv.style.display = 'none';
+  alert("Phòng đã đầy! Vui lòng thử lại sau.");
 });
 
-socket.on('gameStart', (state) => {
-    gameState = state;
-    msgDiv.style.display = 'none';
-    requestAnimationFrame(gameLoopClient);
+socket.on('paddleMove', (data) => {
+  if (playerNumber === 1) opponent.x = data.x;
+  else paddle.x = data.x;
 });
 
-socket.on('gameState', (state) => {
-    gameState = state;
+socket.on('playerLeft', () => {
+  document.getElementById('statusText').textContent = "Người chơi kia đã thoát!";
+  running = false;
 });
 
-socket.on('serverMessage', (data) => {
-    msgDiv.textContent = data.message;
-    msgDiv.style.display = 'block';
+socket.on('gameEnded', (data) => {
+  document.getElementById('statusText').textContent = "Trận đấu đã kết thúc!";
+  running = false;
 });
 
-document.addEventListener('keydown', (e) => {
-    keys[e.key] = true;
-    
-    if (e.key === ' ' && gameState && gameState.isGameOver) {
-        socket.emit('restartGame');
-    }
-});
-document.addEventListener('keyup', (e) => {
-    keys[e.key] = false;
-});
-
-function gameLoopClient() {
-    if (!gameState) return;
-
-    updatePlayerMovement(); 
-
-    ctx.fillStyle = '#000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    drawGame(gameState);
-
-    if (gameState.isGameOver) {
-        msgDiv.style.display = 'block';
-        const winner = gameState.score.player1 > gameState.score.player2 ? "NGƯỜI CHƠI 1" : "NGƯỜI CHƠI 2";
-        msgDiv.textContent = `${winner} THẮNG! NHẤN SPACE để chơi lại`;
-    }
-
-    requestAnimationFrame(gameLoopClient);
+function drawRect(x, y, w, h, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, w, h);
 }
 
-function updatePlayerMovement() {
-    if (!playerNumber || !gameState) return;
-    
-    let currentY = (playerNumber === 1) ? gameState.player1Y : gameState.player2Y;
-    let newY = currentY;
-    const speed = gameState.paddleSpeed; 
-
-    if (playerNumber === 1) { 
-        if (keys['w'] || keys['W']) newY -= speed;
-        if (keys['s'] || keys['S']) newY += speed;
-    } else if (playerNumber === 2) { 
-        if (keys['ArrowUp']) newY -= speed;
-        if (keys['ArrowDown']) newY += speed;
-    }
-
-    if (newY < 0) newY = 0;
-    if (newY > canvas.height - PADDLE_HEIGHT) newY = canvas.height - PADDLE_HEIGHT;
-
-    if (newY !== currentY) {
-        socket.emit('move', { y: newY });
-    }
+function drawBall(x, y, r, color) {
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.closePath();
 }
 
-function drawGame(state) {
-    const color = RAINBOW_COLORS[state.colorIndex];
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 10;
-    ctx.strokeRect(5, 5, canvas.width - 10, canvas.height - 10);
-
-    ctx.setLineDash([5, 10]);
-    ctx.strokeStyle = '#333';
-    ctx.beginPath();
-    ctx.moveTo(canvas.width / 2, 0);
-    ctx.lineTo(canvas.width / 2, canvas.height);
-    ctx.stroke();
-
-    ctx.fillStyle = color;
-    ctx.fillRect(0, state.player1Y, 10, PADDLE_HEIGHT);
-    ctx.fillRect(canvas.width - 10, state.player2Y, 10, PADDLE_HEIGHT);
-
-    ctx.fillStyle = color;
-    ctx.beginPath();
-    ctx.arc(state.ballX, state.ballY, 5, 0, Math.PI * 2);
-    ctx.fill();
-
-    ctx.fillStyle = '#FFF';
-    ctx.font = 'bold 50px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(state.score.player1, canvas.width / 4, 60);
-    ctx.fillText(state.score.player2, (canvas.width / 4) * 3, 60);
+function movePaddle(e) {
+  const rect = canvas.getBoundingClientRect();
+  paddle.x = e.clientX - rect.left - paddle.w / 2;
+  socket.emit('paddleMove', { x: paddle.x });
 }
+
+canvas.addEventListener('mousemove', movePaddle);
+
+function moveBall() {
+  ball.x += ball.dx;
+  ball.y += ball.dy;
+
+  if (ball.x < ball.r || ball.x > canvas.width - ball.r) ball.dx *= -1;
+  if (ball.y < ball.r || ball.y > canvas.height - ball.r) ball.dy *= -1;
+
+  // Va chạm với thanh
+  if (ball.y + ball.r > paddle.y &&
+      ball.x > paddle.x && ball.x < paddle.x + paddle.w) ball.dy *= -1;
+
+  if (ball.y - ball.r < opponent.y + opponent.h &&
+      ball.x > opponent.x && ball.x < opponent.x + opponent.w) ball.dy *= -1;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawRect(paddle.x, paddle.y, paddle.w, paddle.h, 'white');
+  drawRect(opponent.x, opponent.y, opponent.w, opponent.h, 'gray');
+  drawBall(ball.x, ball.y, ball.r, 'yellow');
+}
+
+function gameLoop() {
+  if (!running) return;
+  draw();
+  moveBall();
+  requestAnimationFrame(gameLoop);
+}
+
+document.getElementById('restartBtn').onclick = () => {
+  ball = { x: 450, y: 250, dx: 4, dy: 4, r: 10 };
+  running = true;
+  gameLoop();
+};
+
+document.getElementById('exitBtn').onclick = () => {
+  socket.emit('exitGame');
+  running = false;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  document.getElementById('statusText').textContent = "Bạn đã thoát trận.";
+};
