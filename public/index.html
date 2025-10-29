@@ -2,15 +2,16 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>PING PONG MULTIPLAYER</title>
+  <title>PING PONG ONLINE</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Trang chính -->
+  <!-- Màn hình chính -->
   <div id="lobby">
-    <h2>🏓 PING PONG MULTIPLAYER</h2>
+    <h2>🏓 PING PONG ONLINE</h2>
     <button id="randomBtn" class="btn blue">🎲 Chơi ngẫu nhiên</button>
-    <button id="createBtn" class="btn green">🏠 Tạo / Tham gia phòng</button>
+    <button id="createBtn" class="btn green">🏠 Tạo phòng</button>
+    <button id="joinBtn" class="btn yellow">🔑 Tham gia phòng</button>
     <div id="message"></div>
   </div>
 
@@ -18,7 +19,7 @@
   <div id="create-room" style="display:none;">
     <h3>Phòng của bạn</h3>
     <p id="roomCodeDisplay">Đang tạo...</p>
-    <p>Gửi mã này cho bạn bè để họ tham gia phòng.</p>
+    <p>Gửi mã này cho bạn bè để họ tham gia.</p>
     <button class="backBtn btn gray">⬅ Quay lại</button>
   </div>
 
