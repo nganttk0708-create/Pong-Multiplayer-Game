@@ -2,21 +2,41 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Multiplayer Ping Pong</title>
+  <title>PING PONG MULTIPLAYER</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Trang chính -->
   <div id="lobby">
-    <h2>🏓 Multiplayer Ping Pong</h2>
-    <input type="text" id="roomInput" placeholder="Nhập ID phòng (VD: ABC12)">
-    <button id="joinBtn" class="btn blue">Tham gia phòng riêng</button>
-    <div class="divider">— HOẶC —</div>
-    <button id="randomBtn" class="btn red">Tìm trận ngẫu nhiên</button>
+    <h2>🏓 PING PONG MULTIPLAYER</h2>
+    <button id="randomBtn" class="btn blue">🎲 Chơi ngẫu nhiên</button>
+    <button id="createBtn" class="btn green">🏠 Tạo / Tham gia phòng</button>
     <div id="message"></div>
   </div>
 
+  <!-- Tạo phòng -->
+  <div id="create-room" style="display:none;">
+    <h3>Phòng của bạn</h3>
+    <p id="roomCodeDisplay">Đang tạo...</p>
+    <p>Gửi mã này cho bạn bè để họ tham gia phòng.</p>
+    <button class="backBtn btn gray">⬅ Quay lại</button>
+  </div>
+
+  <!-- Tham gia phòng -->
+  <div id="join-room" style="display:none;">
+    <h3>🔑 Nhập mã phòng</h3>
+    <input type="text" id="roomInput" placeholder="Nhập mã phòng (VD: ABC12)">
+    <button id="joinRoomBtn" class="btn blue">Vào phòng</button>
+    <button class="backBtn btn gray">⬅ Quay lại</button>
+  </div>
+
+  <!-- Game -->
   <div id="game" style="display:none;">
     <canvas id="gameCanvas" width="600" height="400"></canvas>
+    <div class="game-buttons">
+      <button id="rematchBtn" class="btn blue">🔁 Chơi lại</button>
+      <button id="exitBtn" class="btn red">🚪 Thoát</button>
+    </div>
     <div id="message"></div>
   </div>
 
