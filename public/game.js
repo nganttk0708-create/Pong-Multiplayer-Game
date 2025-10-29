@@ -1,81 +1,102 @@
 const socket = io();
 
-// ====================== GIAO DIỆN ======================
-const welcomeScreen = document.getElementById("welcome-screen");
-const menuScreen = document.getElementById("menu-screen");
-const gameCanvas = document.getElementById("gameCanvas");
+// 🎬 Các màn hình
+const welcome = document.getElementById("welcome-screen");
+const menu = document.getElementById("menu-screen");
+const game = document.getElementById("game-screen");
 
 const startBtn = document.getElementById("start-btn");
 const randomBtn = document.getElementById("random-btn");
 const createBtn = document.getElementById("create-btn");
+const joinToggle = document.getElementById("join-toggle");
 const joinBtn = document.getElementById("join-btn");
-const roomInput = document.getElementById("room-input");
-const roomInfo = document.getElementById("room-info");
+const restartBtn = document.getElementById("restart-btn");
+const exitBtn = document.getElementById("exit-btn");
 
+const roomInput = document.getElementById("room-input");
+const info = document.getElementById("info");
+const roomCodeSpan = document.getElementById("room-code");
+const createSection = document.getElementById("create-section");
+const joinSection = document.getElementById("join-section");
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+let ball = { x: 400, y: 250, dx: 3, dy: 3, radius: 10 };
+let running = false;
+
+// ================== CHUYỂN MÀN HÌNH ==================
 startBtn.onclick = () => {
-  welcomeScreen.classList.add("hidden");
-  menuScreen.classList.remove("hidden");
+  welcome.classList.add("hidden");
+  menu.classList.remove("hidden");
 };
 
-// ====================== SOCKET ======================
+exitBtn.onclick = () => {
+  game.classList.add("hidden");
+  menu.classList.remove("hidden");
+  running = false;
+};
+
+restartBtn.onclick = () => {
+  startGame();
+};
+
+// ================== SOCKET ==================
 randomBtn.onclick = () => socket.emit("playRandom");
-createBtn.onclick = () => socket.emit("createRoom");
+createBtn.onclick = () => {
+  socket.emit("createRoom");
+  createSection.classList.remove("hidden");
+};
+joinToggle.onclick = () => {
+  joinSection.classList.toggle("hidden");
+};
+
 joinBtn.onclick = () => {
   const code = roomInput.value.trim().toUpperCase();
   if (code) socket.emit("joinRoom", code);
 };
 
-socket.on("waiting", (msg) => {
-  roomInfo.innerHTML = `<b>${msg}</b>`;
-});
+socket.on("waiting", (msg) => (info.innerText = msg));
 
 socket.on("roomCreated", (code) => {
-  roomInfo.innerHTML = `🎮 Phòng của bạn: <b>${code}</b><br>Gửi mã này cho bạn bè!`;
+  roomCodeSpan.innerText = code;
+  info.innerText = "Chờ người khác vào phòng...";
 });
 
 socket.on("startGame", ({ roomCode }) => {
-  menuScreen.classList.add("hidden");
-  gameCanvas.classList.remove("hidden");
-  startGame(roomCode);
+  info.innerText = `Phòng ${roomCode} bắt đầu!`;
+  menu.classList.add("hidden");
+  game.classList.remove("hidden");
+  startGame();
 });
 
-socket.on("roomError", (msg) => {
-  roomInfo.innerHTML = `<span style="color:red">${msg}</span>`;
-});
+socket.on("roomError", (msg) => (info.innerText = msg));
+socket.on("playerLeft", (msg) => alert(msg));
 
-socket.on("playerLeft", (msg) => {
-  alert(msg);
-  location.reload();
-});
+// ================== GAME LOGIC ==================
+function startGame() {
+  ball = { x: 400, y: 250, dx: 2.5, dy: 2.5, radius: 10 };
+  running = true;
+  gameLoop();
+}
 
-// ====================== GAME ======================
-function startGame(roomCode) {
-  const ctx = gameCanvas.getContext("2d");
-  let ballX = 400,
-      ballY = 250,
-      ballSpeedX = 2,
-      ballSpeedY = 2;
+function gameLoop() {
+  if (!running) return;
+  updateBall();
+  drawBall();
+  requestAnimationFrame(gameLoop);
+}
 
-  function draw() {
-    ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
-    ctx.fillStyle = "white";
-    ctx.beginPath();
-    ctx.arc(ballX, ballY, 10, 0, Math.PI * 2);
-    ctx.fill();
-  }
+function updateBall() {
+  ball.x += ball.dx;
+  ball.y += ball.dy;
+  if (ball.x < 10 || ball.x > 790) ball.dx *= -1;
+  if (ball.y < 10 || ball.y > 490) ball.dy *= -1;
+}
 
-  function update() {
-    ballX += ballSpeedX;
-    ballY += ballSpeedY;
-    if (ballX < 0 || ballX > 800) ballSpeedX *= -1;
-    if (ballY < 0 || ballY > 500) ballSpeedY *= -1;
-  }
-
-  function loop() {
-    update();
-    draw();
-    requestAnimationFrame(loop);
-  }
-
-  loop();
+function drawBall() {
+  ctx.clearRect(0, 0, 800, 500);
+  ctx.fillStyle = "white";
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
+  ctx.fill();
 }

@@ -1,49 +1,30 @@
 body {
-  margin: 0;
-  font-family: 'Poppins', sans-serif;
-  background: linear-gradient(135deg, #232526, #414345);
+  background: #2c2c2c;
   color: white;
   text-align: center;
-}
-
-#menu {
-  padding-top: 150px;
-}
-
-#menu button {
-  background-color: #4CAF50;
-  color: white;
-  font-size: 20px;
-  border: none;
-  padding: 12px 25px;
-  border-radius: 10px;
-  cursor: pointer;
-}
-
-#menu button:hover {
-  background-color: #45a049;
-}
-
-canvas {
-  background-color: black;
-  border: 4px solid white;
-  margin-top: 20px;
-  border-radius: 10px;
-}
-
-.buttons {
-  margin-top: 15px;
+  font-family: "Segoe UI", sans-serif;
+  margin-top: 80px;
 }
 
 button {
   font-size: 18px;
   padding: 10px 20px;
-  margin: 5px;
-  border-radius: 8px;
   border: none;
+  border-radius: 8px;
+  margin: 8px;
   cursor: pointer;
 }
 
-#restartBtn { background-color: #2196F3; color: white; }
-#exitBtn { background-color: #f44336; color: white; }
-#statusText { font-size: 18px; margin-top: 10px; }
+.green-btn {
+  background: #4CAF50;
+  color: white;
+}
+
+.screen.hidden {
+  display: none;
+}
+
+canvas {
+  background: black;
+  border: 2px solid white;
+}

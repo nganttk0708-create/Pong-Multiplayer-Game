@@ -6,24 +6,33 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- Màn hình chào -->
+  <!-- 🌟 Màn hình chào -->
   <div id="welcome-screen" class="screen">
     <h1>🏓 Ping Pong Online</h1>
     <button id="start-btn" class="green-btn">Vào chơi</button>
   </div>
 
-  <!-- Màn hình chọn chế độ -->
+  <!-- 🎮 Màn hình chọn chế độ -->
   <div id="menu-screen" class="screen hidden">
     <button id="random-btn">🎲 Chơi ngẫu nhiên</button><br>
-    <button id="create-btn">🎮 Tạo phòng</button><br>
-    <div id="join-section">
-      <input id="room-input" placeholder="Nhập mã phòng">
-      <button id="join-btn">🔑 Tham gia phòng</button>
+    <button id="create-btn">🧩 Tạo phòng</button><br>
+    <div id="create-section" class="hidden">
+      <p>Mã phòng của bạn: <span id="room-code" style="font-weight:bold"></span></p>
     </div>
-    <div id="room-info"></div>
+    <button id="join-toggle">🔑 Tham gia phòng</button>
+    <div id="join-section" class="hidden">
+      <input id="room-input" placeholder="Nhập mã phòng">
+      <button id="join-btn">Vào</button>
+    </div>
+    <p id="info"></p>
   </div>
 
-  <canvas id="gameCanvas" width="800" height="500" class="hidden"></canvas>
+  <!-- 🕹️ Màn hình game -->
+  <div id="game-screen" class="screen hidden">
+    <canvas id="gameCanvas" width="800" height="500"></canvas><br>
+    <button id="restart-btn">🔁 Tái đấu</button>
+    <button id="exit-btn">🚪 Thoát</button>
+  </div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="game.js"></script>
