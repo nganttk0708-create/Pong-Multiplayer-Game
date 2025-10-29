@@ -6,19 +6,24 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <div id="menu">
+  <!-- Màn hình chào -->
+  <div id="welcome-screen" class="screen">
     <h1>🏓 Ping Pong Online</h1>
-    <button id="startBtn">Vào chơi</button>
+    <button id="start-btn" class="green-btn">Vào chơi</button>
   </div>
 
-  <div id="gameContainer" style="display:none;">
-    <canvas id="gameCanvas" width="900" height="500"></canvas>
-    <div class="buttons">
-      <button id="restartBtn">🔁 Tái đấu</button>
-      <button id="exitBtn">🚪 Thoát</button>
+  <!-- Màn hình chọn chế độ -->
+  <div id="menu-screen" class="screen hidden">
+    <button id="random-btn">🎲 Chơi ngẫu nhiên</button><br>
+    <button id="create-btn">🎮 Tạo phòng</button><br>
+    <div id="join-section">
+      <input id="room-input" placeholder="Nhập mã phòng">
+      <button id="join-btn">🔑 Tham gia phòng</button>
     </div>
-    <p id="statusText"></p>
+    <div id="room-info"></div>
   </div>
+
+  <canvas id="gameCanvas" width="800" height="500" class="hidden"></canvas>
 
   <script src="/socket.io/socket.io.js"></script>
   <script src="game.js"></script>

@@ -1,58 +1,81 @@
 const socket = io();
 
-document.addEventListener("DOMContentLoaded", () => {
-  const ui = document.createElement("div");
-  ui.style.textAlign = "center";
-  ui.style.marginTop = "40px";
+// ====================== GIAO DIỆN ======================
+const welcomeScreen = document.getElementById("welcome-screen");
+const menuScreen = document.getElementById("menu-screen");
+const gameCanvas = document.getElementById("gameCanvas");
 
-  const info = document.createElement("div");
-  const randomBtn = document.createElement("button");
-  const createBtn = document.createElement("button");
-  const joinBtn = document.createElement("button");
-  const input = document.createElement("input");
+const startBtn = document.getElementById("start-btn");
+const randomBtn = document.getElementById("random-btn");
+const createBtn = document.getElementById("create-btn");
+const joinBtn = document.getElementById("join-btn");
+const roomInput = document.getElementById("room-input");
+const roomInfo = document.getElementById("room-info");
 
-  randomBtn.innerText = "🎲 Chơi ngẫu nhiên";
-  createBtn.innerText = "🎮 Tạo phòng";
-  joinBtn.innerText = "🔑 Tham gia phòng";
-  input.placeholder = "Nhập mã phòng";
+startBtn.onclick = () => {
+  welcomeScreen.classList.add("hidden");
+  menuScreen.classList.remove("hidden");
+};
 
-  randomBtn.style.margin = createBtn.style.margin = joinBtn.style.margin = "8px";
+// ====================== SOCKET ======================
+randomBtn.onclick = () => socket.emit("playRandom");
+createBtn.onclick = () => socket.emit("createRoom");
+joinBtn.onclick = () => {
+  const code = roomInput.value.trim().toUpperCase();
+  if (code) socket.emit("joinRoom", code);
+};
 
-  ui.appendChild(info);
-  ui.appendChild(randomBtn);
-  ui.appendChild(document.createElement("br"));
-  ui.appendChild(createBtn);
-  ui.appendChild(document.createElement("br"));
-  ui.appendChild(input);
-  ui.appendChild(joinBtn);
-  document.body.prepend(ui);
-
-  // ======= Sự kiện socket =======
-  randomBtn.onclick = () => socket.emit("playRandom");
-  createBtn.onclick = () => socket.emit("createRoom");
-  joinBtn.onclick = () => {
-    const code = input.value.trim().toUpperCase();
-    if (code) socket.emit("joinRoom", code);
-  };
-
-  socket.on("waiting", (msg) => {
-    info.innerHTML = `<b>${msg}</b>`;
-  });
-
-  socket.on("roomCreated", (code) => {
-    info.innerHTML = `<b>Phòng của bạn: ${code}</b><br>Chia sẻ mã này cho bạn bè!`;
-  });
-
-  socket.on("startGame", ({ roomCode }) => {
-    info.innerHTML = `<b>Phòng ${roomCode}: Trận đấu bắt đầu!</b>`;
-    startGame(); // Bắt đầu game khi đủ 2 người
-  });
-
-  socket.on("roomError", (msg) => {
-    info.innerHTML = `<span style="color:red">${msg}</span>`;
-  });
-
-  socket.on("playerLeft", (msg) => {
-    info.innerHTML = `<span style="color:red">${msg}</span>`;
-  });
+socket.on("waiting", (msg) => {
+  roomInfo.innerHTML = `<b>${msg}</b>`;
 });
+
+socket.on("roomCreated", (code) => {
+  roomInfo.innerHTML = `🎮 Phòng của bạn: <b>${code}</b><br>Gửi mã này cho bạn bè!`;
+});
+
+socket.on("startGame", ({ roomCode }) => {
+  menuScreen.classList.add("hidden");
+  gameCanvas.classList.remove("hidden");
+  startGame(roomCode);
+});
+
+socket.on("roomError", (msg) => {
+  roomInfo.innerHTML = `<span style="color:red">${msg}</span>`;
+});
+
+socket.on("playerLeft", (msg) => {
+  alert(msg);
+  location.reload();
+});
+
+// ====================== GAME ======================
+function startGame(roomCode) {
+  const ctx = gameCanvas.getContext("2d");
+  let ballX = 400,
+      ballY = 250,
+      ballSpeedX = 2,
+      ballSpeedY = 2;
+
+  function draw() {
+    ctx.clearRect(0, 0, gameCanvas.width, gameCanvas.height);
+    ctx.fillStyle = "white";
+    ctx.beginPath();
+    ctx.arc(ballX, ballY, 10, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  function update() {
+    ballX += ballSpeedX;
+    ballY += ballSpeedY;
+    if (ballX < 0 || ballX > 800) ballSpeedX *= -1;
+    if (ballY < 0 || ballY > 500) ballSpeedY *= -1;
+  }
+
+  function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+  }
+
+  loop();
+}
