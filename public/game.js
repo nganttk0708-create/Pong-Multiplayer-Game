@@ -1,4 +1,4 @@
-// ========================== CẤU HÌNH SOCKET & BIẾN ==========================
+
 const socket = io();
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
@@ -18,7 +18,7 @@ let playerNumber = null;
 let gameState = null;
 const PADDLE_HEIGHT = 80;
 
-// ========================== LOBBY XỬ LÝ ==========================
+
 joinButton.addEventListener('click', () => {
   const roomId = roomIdInput.value.trim();
   const difficulty = difficultySelect.value;
@@ -41,7 +41,7 @@ randomButton.addEventListener('click', () => {
   socket.emit('joinRoom', { roomId: 'RANDOM_MATCH', difficulty });
 });
 
-// ========================== SOCKET EVENTS ==========================
+
 socket.on('playerAssignment', (data) => {
   playerNumber = data.player;
   const text = (playerNumber === 1) ? "1 (Trái)" : "2 (Phải)";
@@ -68,7 +68,7 @@ socket.on('serverMessage', (data) => {
   msgDiv.textContent = data.message;
 });
 
-// ========================== PHÍM ĐIỀU KHIỂN ==========================
+
 const pressed = new Set();
 
 function isMoveKey(k) {
@@ -89,7 +89,7 @@ document.addEventListener('keyup', (e) => {
   pressed.delete(e.key);
 }, { passive: false });
 
-// ========================== HÀM CẬP NHẬT & VẼ GAME ==========================
+
 function updatePlayerMovement() {
   if (!playerNumber || !gameState) return;
 
@@ -163,7 +163,7 @@ function drawGame(state) {
   ctx.fillText(state.score.player2, (canvas.width / 4) * 3, 50);
 }
 
-// ========================== NÚT GIAO DIỆN ==========================
+
 rematchButton.addEventListener('click', () => {
   socket.emit('restartGame');
 });
