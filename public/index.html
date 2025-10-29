@@ -2,39 +2,25 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
-  <title>Ping Pong Online</title>
+  <title>Multiplayer Ping Pong</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <!-- 🌟 Màn hình chào -->
-  <div id="welcome-screen" class="screen">
-    <h1>🏓 Ping Pong Online</h1>
-    <button id="start-btn" class="green-btn">Vào chơi</button>
+  <div id="lobby">
+    <h2>🏓 Multiplayer Ping Pong</h2>
+    <input type="text" id="roomInput" placeholder="Nhập ID phòng (VD: ABC12)">
+    <button id="joinBtn" class="btn blue">Tham gia phòng riêng</button>
+    <div class="divider">— HOẶC —</div>
+    <button id="randomBtn" class="btn red">Tìm trận ngẫu nhiên</button>
+    <div id="message"></div>
   </div>
 
-  <!-- 🎮 Màn hình chọn chế độ -->
-  <div id="menu-screen" class="screen hidden">
-    <button id="random-btn">🎲 Chơi ngẫu nhiên</button><br>
-    <button id="create-btn">🧩 Tạo phòng</button><br>
-    <div id="create-section" class="hidden">
-      <p>Mã phòng của bạn: <span id="room-code" style="font-weight:bold"></span></p>
-    </div>
-    <button id="join-toggle">🔑 Tham gia phòng</button>
-    <div id="join-section" class="hidden">
-      <input id="room-input" placeholder="Nhập mã phòng">
-      <button id="join-btn">Vào</button>
-    </div>
-    <p id="info"></p>
-  </div>
-
-  <!-- 🕹️ Màn hình game -->
-  <div id="game-screen" class="screen hidden">
-    <canvas id="gameCanvas" width="800" height="500"></canvas><br>
-    <button id="restart-btn">🔁 Tái đấu</button>
-    <button id="exit-btn">🚪 Thoát</button>
+  <div id="game" style="display:none;">
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+    <div id="message"></div>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
-  <script src="game.js"></script>
+  <script src="game.js" defer></script>
 </body>
 </html>
