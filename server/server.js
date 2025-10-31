@@ -1,92 +1,144 @@
 const express = require("express");
 const http = require("http");
-const path = require("path");
 const { Server } = require("socket.io");
 
 const app = express();
 const server = http.createServer(app);
+const io = new Server(server);
 
-// ✅ Cho phép client kết nối từ Render (CORS)
-const io = new Server(server, {
-  cors: { origin: "*", methods: ["GET", "POST"] },
-});
+app.use(express.static(__dirname + "/public"));
 
-app.use(express.static(path.join(__dirname, "..", "public")));
+let players = {}; // { id: { y, score } }
+let ball = { x: 300, y: 200, dx: 4, dy: 4, radius: 8 };
+const canvasWidth = 600;
+const canvasHeight = 400;
+const WIN_SCORE = 5;
 
-let rooms = {};
-let waitingPlayer = null;
+// 🟢 Lưu các người chơi đã nhấn "Chơi lại"
+let rematchSet = new Set();
 
+// Khi có client kết nối
 io.on("connection", (socket) => {
-  console.log(`🔵 Người chơi kết nối: ${socket.id}`);
+  console.log("🟢", socket.id, "connected");
+  players[socket.id] = { y: 200, score: 0 };
 
-  // ============================
-  // 🔹 TÌM TRẬN NGẪU NHIÊN
-  // ============================
-  socket.on("playRandom", () => {
-    if (!waitingPlayer) {
-      waitingPlayer = socket;
-      socket.emit("waiting", "⏳ Đang chờ người chơi khác...");
-      console.log(`🕐 ${socket.id} đang chờ...`);
-    } else {
-      const roomCode = Math.random().toString(36).substring(2, 7).toUpperCase();
-      rooms[roomCode] = [waitingPlayer.id, socket.id];
-
-      waitingPlayer.join(roomCode);
-      socket.join(roomCode);
-      io.to(roomCode).emit("startGame", { roomCode });
-      console.log(`🎯 Ghép thành công: ${waitingPlayer.id} vs ${socket.id} (${roomCode})`);
-      waitingPlayer = null;
+  // Nhận dữ liệu di chuyển từ client
+  socket.on("move", (posY) => {
+    if (players[socket.id]) {
+      const minY = 40;
+      const maxY = canvasHeight - 40;
+      players[socket.id].y = Math.max(minY, Math.min(maxY, posY));
     }
   });
 
-  // ============================
-  // 🔹 TẠO PHÒNG RIÊNG
-  // ============================
-  socket.on("createRoom", () => {
-    const code = Math.random().toString(36).substring(2, 7).toUpperCase();
-    rooms[code] = [socket.id];
-    socket.join(code);
-    socket.emit("roomCreated", code);
-    console.log(`🏠 ${socket.id} tạo phòng ${code}`);
-  });
+  // Khi người chơi yêu cầu tái đấu
+  socket.on("requestRematch", () => {
+  rematchSet.add(socket.id);
+  const ids = Object.keys(players);
 
-  // ============================
-  // 🔹 THAM GIA PHÒNG RIÊNG
-  // ============================
-  socket.on("joinRoom", (code) => {
-    const room = rooms[code];
-    if (!room) return socket.emit("roomError", "❌ Phòng không tồn tại!");
-    if (room.length >= 2) return socket.emit("roomError", "⚠️ Phòng đã đủ người!");
-
-    room.push(socket.id);
-    socket.join(code);
-    io.to(code).emit("startGame", { roomCode: code });
-    console.log(`✅ ${socket.id} tham gia phòng ${code}`);
-  });
-
-  // ============================
-  // 🔹 NGẮT KẾT NỐI
-  // ============================
-  socket.on("disconnect", () => {
-    console.log(`🔴 ${socket.id} đã thoát`);
-
-    if (waitingPlayer && waitingPlayer.id === socket.id) waitingPlayer = null;
-
-    for (const [code, players] of Object.entries(rooms)) {
-      const idx = players.indexOf(socket.id);
-      if (idx !== -1) {
-        players.splice(idx, 1);
-        io.to(code).emit("playerLeft", "❗ Người chơi kia đã rời trận!");
-        if (players.length === 0) delete rooms[code];
+  // Nếu chỉ có 1 người nhấn
+  if (rematchSet.size === 1) {
+    ids.forEach(id => {
+      if (id !== socket.id) {
+        io.to(id).emit("message", "🔁 Đối thủ muốn tái đấu!");
       }
-    }
+    });
+  }
+
+  // Nếu cả 2 đều nhấn
+  if (rematchSet.size === 2) {
+    rematchSet.clear();
+    resetGame();
+    io.emit("rematchStart"); // ✅ Gửi sự kiện bắt đầu lại
+    io.emit("message", "🔁 Trận đấu mới bắt đầu!");
+  }
+});
+
+
+  // Khi người chơi ngắt kết nối
+  socket.on("disconnect", () => {
+    delete players[socket.id];
+    rematchSet.delete(socket.id);
+    console.log("🔴", socket.id, "disconnected");
   });
 });
 
-// ============================
-// 🚀 CHẠY SERVER
-// ============================
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`✅ Server đang chạy tại http://localhost:${PORT}`);
+// Reset lại toàn bộ điểm & bóng
+function resetGame() {
+  for (const id in players) {
+    players[id].score = 0;
+    players[id].y = 200;
+  }
+  resetBall();
+}
+
+// Reset bóng về giữa sân
+function resetBall() {
+  ball.x = canvasWidth / 2;
+  ball.y = canvasHeight / 2;
+  ball.dx = 4 * (Math.random() > 0.5 ? 1 : -1);
+  ball.dy = 3 * (Math.random() > 0.5 ? 1 : -1);
+}
+
+// Vòng lặp cập nhật bóng & gửi dữ liệu cho client
+setInterval(() => {
+  const ids = Object.keys(players);
+  if (ids.length < 2) return; // chỉ chơi khi đủ 2 người
+
+  ball.x += ball.dx;
+  ball.y += ball.dy;
+
+  // Va chạm cạnh trên/dưới
+  if (ball.y + ball.radius > canvasHeight || ball.y - ball.radius < 0) {
+    ball.dy *= -1;
+  }
+
+  const left = players[ids[0]];
+  const right = players[ids[1]];
+
+  // Paddle trái
+  if (
+    ball.x - ball.radius < 30 &&
+    ball.y > left.y - 40 &&
+    ball.y < left.y + 40
+  ) {
+    ball.dx *= -1;
+    ball.x = 30 + ball.radius;
+  }
+
+  // Paddle phải
+  if (
+    ball.x + ball.radius > canvasWidth - 30 &&
+    ball.y > right.y - 40 &&
+    ball.y < right.y + 40
+  ) {
+    ball.dx *= -1;
+    ball.x = canvasWidth - 30 - ball.radius;
+  }
+
+  // Nếu bóng ra khỏi biên ngang
+  if (ball.x < 0) {
+    right.score++;
+    io.emit("message", "🏓 Người chơi bên phải ghi điểm!");
+    resetBall();
+  } else if (ball.x > canvasWidth) {
+    left.score++;
+    io.emit("message", "🏓 Người chơi bên trái ghi điểm!");
+    resetBall();
+  }
+
+  // 🟡 Kiểm tra thắng cuộc
+  if (left.score >= WIN_SCORE || right.score >= WIN_SCORE) {
+    const winner = left.score >= WIN_SCORE ? "Bên trái" : "Bên phải";
+    io.emit("gameOver", { winner });
+    resetBall();
+  }
+
+  // Gửi dữ liệu cập nhật cho client
+  io.emit("update", { players, ball });
+}, 30);
+
+// Khởi động server
+server.listen(3000, () => {
+  console.log("✅ Server running at http://localhost:3000");
 });

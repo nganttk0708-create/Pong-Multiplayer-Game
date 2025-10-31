@@ -1,164 +1,112 @@
-document.addEventListener("DOMContentLoaded", () => {
-  const socket = io(window.location.origin, { transports: ["websocket"], secure: true });
+const socket = io();
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
 
-  const lobby = document.getElementById("lobby");
-  const createRoom = document.getElementById("create-room");
-  const joinRoom = document.getElementById("join-room");
-  const gameDiv = document.getElementById("game");
-  const message = document.getElementById("message");
+let players = {};
+let ball = { x: 300, y: 200 };
+let message = "";
+let gameOver = false;
 
-  const randomBtn = document.getElementById("randomBtn");
-  const createBtn = document.getElementById("createBtn");
-  const joinBtn = document.getElementById("joinBtn");
-  const joinRoomBtn = document.getElementById("joinRoomBtn");
-  const roomInput = document.getElementById("roomInput");
-  const backBtns = document.querySelectorAll(".backBtn");
-  const roomCodeDisplay = document.getElementById("roomCodeDisplay");
-  const rematchBtn = document.getElementById("rematchBtn");
-  const exitBtn = document.getElementById("exitBtn");
+// Di chuyển paddle
+document.addEventListener("mousemove", (e) => {
+  if (gameOver) return;
+  const rect = canvas.getBoundingClientRect();
+  const posY = e.clientY - rect.top;
+  socket.emit("move", posY);
+});
 
-  const canvas = document.getElementById("gameCanvas");
-  const ctx = canvas.getContext("2d");
+// Nghe dữ liệu cập nhật
+socket.on("update", (data) => {
+  players = data.players;
+  ball = data.ball;
+  draw();
+});
 
-  // ----- Biến game -----
-  const PADDLE_HEIGHT = 80;
-  const PADDLE_WIDTH = 10;
-  let paddle1Y = 160;
-  let paddle2Y = 160;
-  let ballX = 300, ballY = 200, ballDX = 3, ballDY = 2;
-  let gameStarted = false;
+socket.on("message", (msg) => {
+  message = msg;
+  setTimeout(() => (message = ""), 2000);
+});
 
-  const keys = {};
+socket.on("gameOver", (data) => {
+  if (gameOver) return;
+  gameOver = true;
+  message = `${data.winner} thắng trận!`;
+  draw();
+  console.log("🎮 Game over - hiển thị nút Chơi lại");
+  showRestartOptions();
+});3
 
-  // ====== NÚT Ở LOBBY ======
-  randomBtn.onclick = () => {
-    socket.emit("playRandom");
-    message.textContent = "🎲 Đang tìm người chơi khác...";
-  };
+// Khi trận tái đấu bắt đầu
+socket.on("rematchStart", () => {
+  console.log("🎯 Nhận sự kiện rematchStart từ server");
+  gameOver = false; // ✅ Cho phép paddle di chuyển lại
+  message = "🔁 Trận đấu mới bắt đầu!";
+  draw();
 
-  createBtn.onclick = () => {
-    socket.emit("createRoom");
-    lobby.style.display = "none";
-    createRoom.style.display = "block";
-  };
-
-  joinBtn.onclick = () => {
-    lobby.style.display = "none";
-    joinRoom.style.display = "block";
-  };
-
-  joinRoomBtn.onclick = () => {
-    const code = roomInput.value.trim().toUpperCase();
-    if (!code) return alert("Vui lòng nhập mã phòng!");
-    socket.emit("joinRoom", code);
-    message.textContent = `🔑 Đang tham gia phòng ${code}...`;
-  };
-
-  backBtns.forEach(btn => btn.onclick = resetLobby);
-
-  // ====== NÚT TRONG GAME ======
-  rematchBtn.onclick = () => {
-    resetBall();
-  };
-  exitBtn.onclick = resetLobby;
-
-  // ====== SOCKET ======
-  socket.on("waiting", msg => message.textContent = msg);
-  socket.on("roomCreated", code => roomCodeDisplay.textContent = `Mã phòng của bạn: ${code}`);
-  socket.on("roomError", msg => alert(msg));
-  socket.on("startGame", data => startGame(data.roomCode));
-  socket.on("playerLeft", msg => { alert(msg); resetLobby(); });
-
-  // ====== HÀM GAME ======
-  function startGame(code) {
-    hideAll();
-    gameDiv.style.display = "block";
-    message.textContent = `🚀 Trận đấu bắt đầu! Mã phòng: ${code}`;
-    gameStarted = true;
-    startLoop();
-  }
-
-  function hideAll() {
-    [lobby, createRoom, joinRoom, gameDiv].forEach(el => el.style.display = "none");
-  }
-
-  function resetLobby() {
-    hideAll();
-    lobby.style.display = "block";
-    message.textContent = "";
-    gameStarted = false;
-  }
-
-  // ====== VẬN ĐỘNG ======
-  document.addEventListener("keydown", e => (keys[e.key] = true));
-  document.addEventListener("keyup", e => (keys[e.key] = false));
-
-  function movePaddles() {
-    const speed = 5;
-    if (keys["w"] && paddle1Y > 0) paddle1Y -= speed;
-    if (keys["s"] && paddle1Y < canvas.height - PADDLE_HEIGHT) paddle1Y += speed;
-    if (keys["ArrowUp"] && paddle2Y > 0) paddle2Y -= speed;
-    if (keys["ArrowDown"] && paddle2Y < canvas.height - PADDLE_HEIGHT) paddle2Y += speed;
-  }
-
-  function resetBall() {
-    ballX = canvas.width / 2;
-    ballY = canvas.height / 2;
-    ballDX = 3 * (Math.random() > 0.5 ? 1 : -1);
-    ballDY = 2 * (Math.random() > 0.5 ? 1 : -1);
-  }
-
-  function updateBall() {
-    ballX += ballDX;
-    ballY += ballDY;
-
-    // Tường trên/dưới
-    if (ballY < 0 || ballY > canvas.height) ballDY *= -1;
-
-    // Va chạm thanh trái
-    if (ballX <= PADDLE_WIDTH && ballY >= paddle1Y && ballY <= paddle1Y + PADDLE_HEIGHT)
-      ballDX *= -1;
-
-    // Va chạm thanh phải
-    if (ballX >= canvas.width - PADDLE_WIDTH &&
-        ballY >= paddle2Y &&
-        ballY <= paddle2Y + PADDLE_HEIGHT)
-      ballDX *= -1;
-
-    // Ghi điểm
-    if (ballX < 0 || ballX > canvas.width) resetBall();
-  }
-
-  function draw() {
-    // Nền
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Viền sân
-    ctx.strokeStyle = "#4CAF50";
-    ctx.lineWidth = 2;
-    ctx.strokeRect(0, 0, canvas.width, canvas.height);
-
-    // Thanh đỡ
-    ctx.fillStyle = "#4CAF50";
-    ctx.fillRect(0, paddle1Y, PADDLE_WIDTH, PADDLE_HEIGHT);
-    ctx.fillRect(canvas.width - PADDLE_WIDTH, paddle2Y, PADDLE_WIDTH, PADDLE_HEIGHT);
-
-    // Bóng
-    ctx.fillStyle = "#FFD700";
-    ctx.beginPath();
-    ctx.arc(ballX, ballY, 8, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  function startLoop() {
-    function loop() {
-      if (!gameStarted) return;
-      movePaddles();
-      updateBall();
-      draw();
-      requestAnimationFrame(loop);
-    }
-    loop();
+  // Xóa nút chơi lại nếu còn
+  const btn = document.getElementById("restartBtn");
+  if (btn) {
+    btn.remove();
+    console.log("🧹 Đã xóa nút Chơi lại");
   }
 });
+
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "white";
+
+  // Bóng
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, 8, 0, Math.PI * 2);
+  ctx.fill();
+
+  const ids = Object.keys(players);
+  ids.forEach((id, i) => {
+    const x = i === 0 ? 20 : canvas.width - 30;
+    const y = players[id].y - 40;
+    ctx.fillRect(x, y, 10, 80);
+
+    // Điểm
+    ctx.font = "20px Arial";
+    ctx.fillText(players[id].score ?? 0, i === 0 ? 100 : canvas.width - 120, 30);
+  });
+
+  // Thông báo
+  if (message) {
+    ctx.font = "18px Arial";
+    ctx.fillText(message, canvas.width / 2 - 100, 50);
+  }
+}
+
+function showRestartOptions() {
+  // Kiểm tra xem đã có nút chưa
+  const existingBtn = document.getElementById("restartBtn");
+  if (existingBtn) {
+    console.log("⚠️ Nút Chơi lại đã tồn tại, không tạo thêm");
+    return;
+  }
+
+  // Tìm vùng chứa nút
+  const container = document.getElementById("buttonContainer");
+  if (!container) {
+    console.error("❌ Không tìm thấy #buttonContainer trong DOM!");
+    return;
+  }
+
+  // Tạo nút mới
+  const btn = document.createElement("button");
+  btn.id = "restartBtn";
+  btn.textContent = "Chơi lại";
+
+  btn.onclick = () => {
+    console.log("📩 Gửi requestRematch đến server");
+    socket.emit("requestRematch");
+    btn.disabled = true;
+    message = "⏳ Đang chờ đối thủ...";
+    draw();
+  };
+
+  container.appendChild(btn);
+  console.log("✅ Đã thêm nút Chơi lại vào #buttonContainer");
+}
